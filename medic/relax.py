@@ -8,8 +8,6 @@ import shlex
 from shutil import copyfile
 import attr
 import pandas as pd
-import runners.slurm as slurm
-import py_rosetta.rosetta_wrappers.symmetry as symm
 import pathlib
 from time import sleep
 

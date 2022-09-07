@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 import typing
-
 import attr
 import numpy as np
 

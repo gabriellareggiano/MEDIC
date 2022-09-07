@@ -18,12 +18,12 @@ import subprocess
 import shlex
 from math import floor
 
-import py_rosetta.validation_metrics.broken_DAN as broken_DAN
-import py_rosetta.validation_metrics.run_denstools as dens_zscores
-from py_rosetta.util_pyrosetta import extract_energy_table
+import medic.broken_DAN as broken_DAN
+import medic.run_denstools as dens_zscores
+from medic.util import extract_energy_table
 
-from daimyo.core.pdb_io import read_pdb_file, write_pdb_file
-from py_rosetta.rosetta_wrappers.relax import Relax
+from medic.pdb_io import read_pdb_file, write_pdb_file
+from medic.relax import Relax
 
 def parseargs():
     parser = argparse.ArgumentParser()

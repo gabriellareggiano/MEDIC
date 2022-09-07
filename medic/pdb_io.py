@@ -4,7 +4,7 @@ import sys
 
 import numpy as np
 
-from daimyo.core import pose, util
+from medic import pose, util
 
 
 def fon(s):

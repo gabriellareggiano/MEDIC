@@ -7,11 +7,10 @@ import argparse
 import os
 import pandas as pd
 import subprocess
-from daimyo.core.pdb_io import read_pdb_file, write_pdb_file
-from daimyo.core.util import get_number_of_residues
+from medic.pdb_io import read_pdb_file, write_pdb_file
+from medic.util import get_number_of_residues
 from more_itertools import consecutive_groups
 import shlex
-import pathlib
 from time import sleep
 from math import ceil
 from copy import deepcopy
@@ -36,18 +35,6 @@ def close_gaps(resi_list, min_gap):
     # if len(new_resis) != len(resi_list):
     #    return close_gaps(new_resis, min_gap=10)
     return sorted(new_resis)
-
-
-def remove_tiny(resi_list, min_len):
-    """ some code to remove small pieces of residues,
-        not currently in use
-    """
-    final_resis = sorted(resi_list.copy())
-    for grp in consecutive_groups(final_resis):
-        if len(list(grp)) < min_len:
-            for g in grp:
-                final_resis.remove(g)
-    return final_resis
 
 
 def same_chain_and_stragglers(residues, pinf, slide_len):
