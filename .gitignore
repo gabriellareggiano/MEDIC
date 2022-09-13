@@ -1,0 +1,6 @@
+__pycache/
+*.py[cod]
+*$py.class
+.cache
+*.egg
+*.egg-info
