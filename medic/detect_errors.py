@@ -13,7 +13,9 @@ import argparse
 import os
 import importlib.resources as pkg_resources
 from math import floor
+import pandas as pd
 
+from . import medic_model
 import medic.broken_DAN as broken_DAN
 import medic.run_denstools as dens_zscores
 from medic.util import extract_energy_table
@@ -55,10 +57,10 @@ def compile_data(pdbf, mapf, reso, workers=100):
     return data
 
 
-def get_feature_order(txt_model_desc):
+def get_feature_order():
     feats = list()
-    with open(txt_model_desc, 'r') as f:
-        lines = [ x.strip() for x in f.readlines() ]
+    params_str = pkg_resources.read_text(medic_model, "model_params.txt")
+    lines = [ x.strip() for x in params_str.split('\n') if x ]
     start = False
     for line in lines:
         if start:
@@ -68,8 +70,8 @@ def get_feature_order(txt_model_desc):
     return feats
 
 
-def get_probabilities(df, model, model_desc, prob_coln):
-    order = get_feature_order(model_desc)
+def get_probabilities(df, model, prob_coln):
+    order = get_feature_order()
     data = df[order]
     print('predicting probabilities')
     probabilities = model.predict_proba(data)
@@ -94,15 +96,29 @@ def set_pred_as_bfac(pdbf, predictions, prob_coln):
     write_pdb_file(pose, new_pdbf)
 
 
+def run_error_detection(pdbf, mapf, reso, run_relax=False):
+    if run_relax:
+        print("running local relax")
+        relax = Relax(mapf, reso)
+        pyrosetta.init(relax.get_flag_file_str())
+        pdbf = run_local_relax(pdbf, relax)
+    dat = compile_data(pdbf, mapf, reso, workers=20)
+    print(f'loading model')
+    loaded_model = pickle.load(pkg_resources.open_binary(medic_model, 'model.sav'))
+    prob_coln = "error_probability"
+    err_pred = get_probabilities(dat, loaded_model, prob_coln)
+    print(f' errors predicted for all thresholds')
+    err_pred.to_csv(f"{os.path.basename(pdbf)[:-4]}_MEDIC_predictions.csv")
+    print('adding labels to bfactor in pdbs')
+    set_pred_as_bfac(pdbf, err_pred, prob_coln)
+    print('finished')
+
+
 def parseargs():
     parser = argparse.ArgumentParser()
     parser.add_argument('--pdb', type=str, required=True)
     parser.add_argument('--map', type=str, required=True)
     parser.add_argument('--reso', type=float, required=True)
-    parser.add_argument('--ml_model', type=str, required=True,
-        help="machine learned model from regression, saved in pickle/hdf5 file")
-    parser.add_argument('--model_params', type=str, required=True,
-        help='txt file that contains coefficients and intercept of linear model')
     parser.add_argument('--relax', action="store_true", default=False, 
         help="run a relax before hand, pass model to the error detection")
     return parser.parse_args()
@@ -110,22 +126,7 @@ def parseargs():
 
 def commandline_main():
     args = parseargs()
-    if args.relax:
-        print("running local relax")
-        relax = Relax(args.map, args.reso)
-        pyrosetta.init(relax.get_flag_file_str())
-        args.pdb = run_local_relax(args.pdb, relax)
-    dat = compile_data(args.pdb, args.map, args.reso,
-                           workers=50)
-    print(f'loading model')
-    loaded_model = pickle.load(open(args.ml_model,'rb'))
-    prob_coln = "error_probability"
-    err_pred = get_probabilities(dat, loaded_model, args.model_params, prob_coln)
-    print(f' errors predicted for all thresholds')
-    err_pred.to_csv(f"{os.path.basename(args.pdb)[:-4]}_MEDIC_predictions.csv")
-    print('adding labels to bfactor in pdbs')
-    set_pred_as_bfac(args.pdb, err_pred, prob_coln)
-    print('finished')
+    run_error_detection(args.pdb, args.map, args.reso, run_relax=args.relax)
 
 
 if __name__ == "__main__":
