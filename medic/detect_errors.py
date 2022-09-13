@@ -25,12 +25,12 @@ from medic.util import extract_energy_table
 from medic.pdb_io import read_pdb_file, write_pdb_file
 from medic.relax import Relax
 
+
 def parseargs():
     parser = argparse.ArgumentParser()
     parser.add_argument('--pdb', type=str, required=True)
     parser.add_argument('--map', type=str, required=True)
     parser.add_argument('--reso', type=float, required=True)
-    parser.add_argument('--atom_mask', type=float, required=False, default=None)
     parser.add_argument('--feat_csv', type=str, required=False, 
         help='already collected the features? give the csv file')
     parser.add_argument('--ml_model', type=str, required=True,
@@ -57,10 +57,9 @@ def run_local_relax(pdbf, mapf, reso):
     return expected_model
 
 
-def compile_data(pdbf, mapf, reso, atom_mask, workers=100):
+def compile_data(pdbf, mapf, reso, workers=100):
     print('calculating zscores')
-    data = dens_zscores.run_denstools_perres(pdbf, mapf, reso,
-                                     atom_mask=atom_mask)
+    data = dens_zscores.run_denstools_perres(pdbf, mapf, reso)
     print('zscores calculated')
     WINDOW_LENGTH = 20
     NEIGHBORHOOD = 20
@@ -173,7 +172,6 @@ def commandline_main():
         args.pdb = run_local_relax(args.pdb, args.map, args.reso)
     if not args.feat_csv:
         dat = compile_data(args.pdb, args.map, args.reso,
-                           atom_mask=args.atom_mask,
                            workers=50)
     else:
         dat = pd.read_csv(args.feat_csv)
