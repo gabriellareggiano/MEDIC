@@ -8,7 +8,6 @@ setup(name="medic",
 	description="Model Error Detection in Cryo-EM",
 	long_description=open('README.md').read(),
 	author="Gabriella Reggiano",
-	packages=find_packages(where="medic"),
-	package_dir={"":"medic"},
-	package_data={"medic_model":"*"}
+	packages=find_packages(exclude=["medic_model"]),
+	include_package_data=True
 )

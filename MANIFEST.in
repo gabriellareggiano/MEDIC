@@ -1,0 +1,2 @@
+include medic/medic_model/model_params.txt
+include medic/medic_model/model.sav
