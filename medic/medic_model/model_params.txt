@@ -1,0 +1,7 @@
+intercept: 5.14752 
+coefficients: 
+    perResZDensWin1: -0.38177
+    perResZDensWin3: -0.16883
+    lddt: -10.40609
+    rama_prepro: 0.58827
+    cart_bonded: 0.40681
