@@ -3,54 +3,42 @@
         run a local relax (optional)
         calculate density z-scores using my method
         run broken DAN to get lddts
-        predict probabilities with the provided logistic regression model
+        predict probabilities with the logistic regression model
         write the probabilties to a csv and a pdb file
 """
-import pyrosetta
 import pickle
-import typing
 import argparse
 import os
 import importlib.resources as pkg_resources
 from math import floor
-import pandas as pd
 
-from . import medic_model
+import medic.medic_model
 import medic.broken_DAN as broken_DAN
-import medic.run_denstools as dens_zscores
+import medic.density_zscores as dens_zscores
+import medic.refine as refine
 from medic.util import extract_energy_table
 from medic.pdb_io import read_pdb_file, write_pdb_file
-from medic.relax import Relax
-
-
-def run_local_relax(pdbf, relax):
-    out_pdb = f"{pdbf[:-4]}_0001.pdb"
-    pose = pyrosetta.pose_from_file(pdbf)
-    relax.apply(pose)
-    pose.dump_pdb(out_pdb)
-    return out_pdb
 
 
 def compile_data(pdbf, mapf, reso, workers=100):
-    print('calculating zscores')
-    data = dens_zscores.run_denstools_perres(pdbf, mapf, reso)
-    print('zscores calculated')
+    print('\tcalculating zscores')
+    data = dens_zscores.run(pdbf, mapf, reso)
+
     WINDOW_LENGTH = 20
     NEIGHBORHOOD = 20
     SCRIPT = "/home/reggiano/git/DeepAccNet/DeepAccNet.py"
     MEM = 40
-    print('running DAN')
+    print('\tcalculating predicted lddts')
+    #TODO - have this return a series, not a df??
     deepAccNet_scores = broken_DAN.calc_lddts(
                             pdbf,
                             WINDOW_LENGTH, WINDOW_LENGTH, NEIGHBORHOOD,
                             MEM, workers, SCRIPT)
-    print('lddts calculated')
     # NOTE - this naming convention comes from broken_DAN script
-    try: 
-        data["lddt"] = deepAccNet_scores["lddt"]
-    except KeyError:
-        print('lddt not in dataframe, looking for mean_lddt') # currently never used
-        data["lddt"] = deepAccNet_scores["mean_lddt"]
+    data["lddt"] = deepAccNet_scores["lddt"]
+
+    #TODO - return data series or something??
+    # TODO - change this to pyrosetta thing instead??
     eng_dat = extract_energy_table(pdbf)
     data["rama_prepro"] = eng_dat["rama_prepro"]
     data["cart_bonded"] = eng_dat["cart_bonded"]
@@ -59,7 +47,7 @@ def compile_data(pdbf, mapf, reso, workers=100):
 
 def get_feature_order():
     feats = list()
-    params_str = pkg_resources.read_text(medic_model, "model_params.txt")
+    params_str = pkg_resources.read_text(medic.medic_model, "model_params.txt")
     lines = [ x.strip() for x in params_str.split('\n') if x ]
     start = False
     for line in lines:
@@ -98,17 +86,22 @@ def set_pred_as_bfac(pdbf, predictions, prob_coln):
 
 def run_error_detection(pdbf, mapf, reso, run_relax=False):
     if run_relax:
+        refined_pdb = f"{pdbf[:-4]}_refined.pdb"
         print("running local relax")
-        relax = Relax(mapf, reso)
-        pyrosetta.init(relax.get_flag_file_str())
-        pdbf = run_local_relax(pdbf, relax)
+        refine.run(pdbf, mapf, reso, refined_pdb)
+        pdbf = refined_pdb
+
+    print("collecting scores")
     dat = compile_data(pdbf, mapf, reso, workers=20)
-    print(f'loading model')
-    loaded_model = pickle.load(pkg_resources.open_binary(medic_model, 'model.sav'))
+
+    print('loading statistical model')
+    loaded_model = pickle.load(pkg_resources.open_binary(medic.medic_model, 'model.sav'))
+
+    print('predicting errors')
     prob_coln = "error_probability"
     err_pred = get_probabilities(dat, loaded_model, prob_coln)
-    print(f' errors predicted for all thresholds')
     err_pred.to_csv(f"{os.path.basename(pdbf)[:-4]}_MEDIC_predictions.csv")
+
     print('adding labels to bfactor in pdbs')
     set_pred_as_bfac(pdbf, err_pred, prob_coln)
     print('finished')

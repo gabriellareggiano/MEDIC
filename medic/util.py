@@ -1,10 +1,6 @@
 """Simple core utils
 """
-
-import typing
-from typing import List
 import pandas as pd
-
 import medic.pose
 
 
