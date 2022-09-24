@@ -1,5 +1,5 @@
 """ script to run DAN in smaller batches on a protein
-TODO - turn this into a class and then run with apply?
+TODO - how to run this as part of git submodule
 """
 
 import numpy as np
@@ -118,36 +118,6 @@ def run_DAN(script, pdb_file):
     return npz_file
 
 
-# honestly this doesn't really work right now.. and idk if i care enough to 
-# make this slightly faster quite yet. TODO here
-def extract_and_run(pose, extract_residues, neighborhood, 
-                    script_loc, pdbn, minimum_gap=10):
-    extracted_pose, new_resis = extract_region(pose, 
-                        extract_residues, 
-                        neighborhood, min_gap=minimum_gap)
-    ext_pdbf = f"{pdbn}_r{resi:04d}.pdb"
-    extracted_pose.dump_pdb(ext_pdbf)
-    log = f"{pdbn}_r{resi:04d}.log"
-    npzf = run_DAN(script_loc, ext_pdbf, log)
-    return npzf
-
-
-def parseargs():
-    parser = argparse.ArgumentParser()
-    dan_params = parser.add_argument_group('DeepAccNet parameters')
-    job_params = parser.add_argument_group('Slurm job parameters')
-    dan_params.add_argument('--pdb', type=str)
-    dan_params.add_argument('--window_length', type=int, default=20)
-    dan_params.add_argument('--sliding_length', type=int, default=20)
-    dan_params.add_argument('--neighborhood', type=float, default=20.0)
-    dan_params.add_argument('--dan_script', type=str,
-        default="/home/reggiano/git/DeepAccNet/DeepAccNet.py")
-    job_params.add_argument('--queue', type=str, default='dimaio')
-    job_params.add_argument('--memory', type=int, default=40)
-    job_params.add_argument('--num_workers', type=int, default=100)
-    return parser.parse_args()
-
-
 def calc_lddts(pdbf, win_len, slide_len, neighborhood, 
                mem, workers, script_loc):
     full_pose = read_pdb_file(pdbf)
@@ -185,7 +155,7 @@ def calc_lddts(pdbf, win_len, slide_len, neighborhood,
             for resi in range(1, total_residues, slide_len):
                 task_identifier.append(resi)
                 end = resi+win_len
-                if end > total_residues:
+                if end >= total_residues:
                     end = total_residues+1
                 main_residues = list(range(resi,end))
                 main_residues = same_chain_and_stragglers(main_residues, pinf, slide_len)
@@ -226,6 +196,22 @@ def calc_lddts(pdbf, win_len, slide_len, neighborhood,
     if slide_len != win_len:
         full_results["mean_lddt"] = full_results.filter(regex='lddt_run').mean(skipna=True, axis=1)
     return full_results
+
+
+def parseargs():
+    parser = argparse.ArgumentParser()
+    dan_params = parser.add_argument_group('DeepAccNet parameters')
+    job_params = parser.add_argument_group('Slurm job parameters')
+    dan_params.add_argument('--pdb', type=str)
+    dan_params.add_argument('--window_length', type=int, default=20)
+    dan_params.add_argument('--sliding_length', type=int, default=20)
+    dan_params.add_argument('--neighborhood', type=float, default=20.0)
+    dan_params.add_argument('--dan_script', type=str,
+        default="/home/reggiano/git/DeepAccNet/DeepAccNet.py")
+    job_params.add_argument('--queue', type=str, default='dimaio')
+    job_params.add_argument('--memory', type=int, default=40)
+    job_params.add_argument('--num_workers', type=int, default=100)
+    return parser.parse_args()
 
 
 def commandline_main():

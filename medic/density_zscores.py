@@ -12,8 +12,6 @@ def run(pdbf: str, mapf: str, reso: float) -> pd.DataFrame:
     """
     atom_mask = 3.2
     flags = ['-ignore_unrecognized_res',
-            '-missing_density_to_jump',
-            '-cryst::crystal_refine',
             '-beta',
             '-beta_cart',
             '-default_max_cycles 200',
