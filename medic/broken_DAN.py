@@ -13,8 +13,6 @@ from copy import deepcopy
 import torch
 import sys
 
-from dask_jobqueue import SLURMCluster
-from dask.distributed import Client
 
 from medic.pdb_io import read_pdb_file, write_pdb_file
 from medic.util import get_number_of_residues
@@ -43,23 +41,24 @@ def same_chain_and_stragglers(residues, pinf, slide_len):
         and to also pick up any stragglers if they are just beyond the sliding dist
         i think the logic here is more complicated than it needs to be..........
     """
+    new_residues = [i for i in residues]
     ch_breaks = [i for i in range(1, len(pinf["chID"])) 
                     if pinf["chID"][i] != pinf["chID"][i-1]]
     for brk in ch_breaks:
         if residues[0] < pinf["ros_resi"][brk] < residues[-1]:
             if pinf["ros_resi"][brk] - residues[0] < residues[-1] - pinf["ros_resi"][brk]:
-                residues = residues[residues.index(pinf["ros_resi"][brk]):]
+                new_residues = residues[residues.index(pinf["ros_resi"][brk]):]
             else:
-                residues = residues[:residues.index(pinf["ros_resi"][brk])]
+                new_residues = residues[:residues.index(pinf["ros_resi"][brk])]
         elif pinf["ros_resi"][brk] < residues[0] and \
           residues[0] - pinf["ros_resi"][brk] <= ceil(slide_len/2):
             for ri in range(pinf["ros_resi"][brk], residues[0]):
-                residues.append(ri)
+                new_residues.append(ri)
         elif pinf["ros_resi"][brk] > residues[-1] and \
           pinf["ros_resi"][brk] - residues[-1] <= ceil(slide_len/2):
             for ri in range(residues[-1]+1, pinf["ros_resi"][brk]):
-                residues.append(ri)
-    return sorted(residues)
+                new_residues.append(ri)
+    return sorted(new_residues)
 
 
 def find_context(pose, ca_atm, nbrhd):
@@ -158,8 +157,76 @@ def run_dan(infilepath):
     return outfilepath
 
 
-def calc_lddts(pdbf, win_len, slide_len, neighborhood, 
-               mem, workers, script_loc):
+def calc_lddts(pdbf, win_len, slide_len, neighborhood):
+    from dask import delayed, compute
+    full_pose = read_pdb_file(pdbf)
+    pinf = {"resn": list(),
+            "resi": list(),
+            "chID": list(),
+            "ros_resi": list() }
+    total_residues = get_number_of_residues(full_pose)
+    resi = 1
+    for ch in full_pose.chains:
+        for grp in ch.groups:
+            pinf["resn"].append(grp.groupName)
+            pinf["resi"].append(grp.groupNumber)
+            pinf["chID"].append(ch.ID)
+            pinf["ros_resi"].append(resi)
+            resi += 1
+    full_results = pd.DataFrame.from_dict(pinf)
+    full_results['lddt'] = np.nan
+
+    print('submitting tasks for DeepAccNet')
+    results = list()
+    all_main_residues = list()
+    all_extracted_residues = list()
+    task_identifier = list()
+    for resi in range(1, total_residues, slide_len):
+        task_identifier.append(resi)
+        end = resi+win_len
+        if end >= total_residues:
+            end = total_residues+1
+        init_residues = list(range(resi,end))
+        main_residues = same_chain_and_stragglers(init_residues, pinf, slide_len)
+        all_main_residues.append(main_residues)
+        extracted_pose, new_resis = extract_region(full_pose,
+                            main_residues, pinf,
+                            neighborhood)
+        all_extracted_residues.append(new_resis)
+        # NOTE - if you change name below you need to change line 197, 'index = ...'
+        ext_pdbf = f"{os.path.basename(pdbf)[:-4]}_r{resi:04d}.pdb" 
+        write_pdb_file(extracted_pose, ext_pdbf)
+        result = delayed(run_dan)(ext_pdbf)
+        results.append(result)
+
+    results = compute(*results)
+
+    print('collecting data')
+    for result in results:
+        npz_data = np.load(result)
+        index = task_identifier.index(int(result.split('_')[-1][:-4].strip('r')))
+        curr_col = f"lddt_run{index:03d}"
+        df_data = pd.DataFrame.from_dict(npz_data["lddt"])
+        df_data["ros_resi"] = all_extracted_residues[index]
+        df_data.rename({0:'lddt'}, axis=1, inplace=True)
+        main_lddts = df_data[df_data['ros_resi'].isin(all_main_residues[index])]
+        if slide_len != win_len: # some overlap
+            full_results[curr_col] = full_results['ros_resi'].map(main_lddts.set_index('ros_resi')['lddt'])
+        else:
+            full_results['lddt'] = full_results['ros_resi'].map(main_lddts.set_index('ros_resi')['lddt']).fillna(full_results['lddt'])
+    
+    print('all data collected')
+    if slide_len != win_len:
+        full_results["mean_lddt"] = full_results.filter(regex='lddt_run').mean(skipna=True, axis=1)
+    return full_results
+
+
+def calc_lddts_hpc(pdbf, win_len, slide_len, 
+                neighborhood, mem, 
+                conda_env, queue, workers):
+    from dask_jobqueue import SLURMCluster
+    from dask.distributed import Client
+
     full_pose = read_pdb_file(pdbf)
     pinf = {"resn": list(),
             "resi": list(),
@@ -185,10 +252,10 @@ def calc_lddts(pdbf, win_len, slide_len, neighborhood,
     with SLURMCluster(
         cores=1,
         memory=f"{mem}GB",
-        queue="cpu",
+        queue=queue,
         walltime="01:00:00", # this should in theory by plenty of time
         job_name=f"{os.path.basename(pdbf)[:4]}_DAN",
-        env_extra=["source ~/.bashrc"]
+        env_extra=[f"source activate {conda_env}"]
     ) as cluster:
         cluster.adapt(minimum=0, maximum=workers)
         with Client(cluster) as client:
@@ -197,8 +264,8 @@ def calc_lddts(pdbf, win_len, slide_len, neighborhood,
                 end = resi+win_len
                 if end >= total_residues:
                     end = total_residues+1
-                main_residues = list(range(resi,end))
-                main_residues = same_chain_and_stragglers(main_residues, pinf, slide_len)
+                init_residues = list(range(resi,end))
+                main_residues = same_chain_and_stragglers(init_residues, pinf, slide_len)
                 all_main_residues.append(main_residues)
                 extracted_pose, new_resis = extract_region(full_pose,
                                     main_residues, pinf,
@@ -209,11 +276,9 @@ def calc_lddts(pdbf, win_len, slide_len, neighborhood,
                 write_pdb_file(extracted_pose, ext_pdbf)
                 tasks.append(client.submit(run_dan, ext_pdbf))
 
-            # i think this might mean that all the lists 
-            # i made for the next part are unnecessary or at least the indexing part is
             print('gathering results')
             
-            sleep(60) # before running any DAN tasks, wait a bit before reading pdbs
+            sleep(30) # before running any DAN tasks, wait a bit before reading pdbs
             results = client.gather(tasks)
 
     sleep(30) # after closing client, wait a bit before trying to read files
@@ -246,20 +311,18 @@ def parseargs():
     dan_params.add_argument('--window_length', type=int, default=20)
     dan_params.add_argument('--sliding_length', type=int, default=20)
     dan_params.add_argument('--neighborhood', type=float, default=20.0)
-    dan_params.add_argument('--dan_script', type=str,
-        default="/home/reggiano/git/DeepAccNet/DeepAccNet.py")
     job_params.add_argument('--queue', type=str, default='dimaio')
     job_params.add_argument('--memory', type=int, default=40)
+    job_params.add_argument('--conda_env', type=str, default="")
     job_params.add_argument('--num_workers', type=int, default=100)
     return parser.parse_args()
 
 
 def commandline_main():
     args = parseargs()
-    df = calc_lddts(args.pdb, args.window_length, 
+    df = calc_lddts_hpc(args.pdb, args.window_length, 
         args.sliding_length, args.neighborhood, 
-        args.memory, args.num_workers,
-        args.dan_script)
+        args.memory, args.conda_env, args.queue, args.num_workers)
     df.to_csv(f"{os.path.basename(args.pdb)[:4]}_DAN.csv")
 
 

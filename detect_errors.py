@@ -20,20 +20,24 @@ from medic.util import extract_energy_table, clean_dan_files
 from medic.pdb_io import read_pdb_file, write_pdb_file
 
 
-def compile_data(pdbf, mapf, reso, workers=100):
-    print('\tcalculating zscores')
+def compile_data(pdbf, mapf, reso,
+        mem=0, conda_env="", 
+        queue="", workers=0):
+    print('calculating zscores')
     data = dens_zscores.run(pdbf, mapf, reso)
 
     WINDOW_LENGTH = 20
     NEIGHBORHOOD = 20
-    SCRIPT = "/home/reggiano/git/DeepAccNet/DeepAccNet.py"
-    MEM = 40
-    print('\tcalculating predicted lddts')
-    #TODO - have this return a series, not a df??
-    deepAccNet_scores = broken_DAN.calc_lddts(
-                            pdbf,
-                            WINDOW_LENGTH, WINDOW_LENGTH, NEIGHBORHOOD,
-                            MEM, workers, SCRIPT)
+    print('calculating predicted lddts')
+    if mem and conda_env and queue and workers:
+        deepAccNet_scores = broken_DAN.calc_lddts_hpc(pdbf, WINDOW_LENGTH,
+                                WINDOW_LENGTH, NEIGHBORHOOD, mem, conda_env,
+                                queue, workers)
+    else: # run locally
+        #TODO - have this return a series, not a df??
+        deepAccNet_scores = broken_DAN.calc_lddts(
+                                pdbf, WINDOW_LENGTH, 
+                                WINDOW_LENGTH, NEIGHBORHOOD)
     # NOTE - this naming convention comes from broken_DAN script
     data["lddt"] = deepAccNet_scores["lddt"]
 
@@ -84,7 +88,8 @@ def set_pred_as_bfac(pdbf, predictions, prob_coln):
     write_pdb_file(pose, new_pdbf)
 
 
-def run_error_detection(pdbf, mapf, reso, run_relax=False):
+def run_error_detection(pdbf, mapf, reso, run_relax=False,
+                mem=0, conda_env="", queue="", workers=0):
     if run_relax:
         refined_pdb = f"{pdbf[:-4]}_refined.pdb"
         print("running local relax")
@@ -92,7 +97,9 @@ def run_error_detection(pdbf, mapf, reso, run_relax=False):
         pdbf = refined_pdb
 
     print("collecting scores")
-    dat = compile_data(pdbf, mapf, reso, workers=20)
+    dat = compile_data(pdbf, mapf, reso, 
+                    mem=mem, conda_env=conda_env, 
+                    queue=queue, workers=workers)
 
     print('loading statistical model')
     loaded_model = pickle.load(pkg_resources.open_binary(medic.medic_model, 'model.sav'))
@@ -109,19 +116,42 @@ def run_error_detection(pdbf, mapf, reso, run_relax=False):
 
 def parseargs():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--pdb', type=str, required=True)
-    parser.add_argument('--map', type=str, required=True)
-    parser.add_argument('--reso', type=float, required=True)
-    parser.add_argument('--relax', action="store_true", default=False, 
+    err_params = parser.add_argument_group('Inputs')
+    job_params = parser.add_argument_group('Running DeepAccNet on HPC')
+    err_params.add_argument('--pdb', type=str, required=True)
+    err_params.add_argument('--map', type=str, required=True)
+    err_params.add_argument('--reso', type=float, required=True)
+    err_params.add_argument('--relax', action="store_true", default=False, 
         help="run a relax before hand, pass model to the error detection")
-    parser.add_argument('--keep_intermediates', action="store_true", default=False,
+    err_params.add_argument('--keep_intermediates', action="store_true", default=False,
         help="dont clean up temperorary files created for deepaccnet")
+    err_params.add_argument('-j', '--processors', type=int, required=False, default=1,
+        help='number processors to use if running locally')
+    job_params.add_argument('--scheduler', action="store_true", default=False,
+        help='submit to cluster, uses slurm scheduler through dask')
+    job_params.add_argument('--queue', type=str, default="", required=False,
+        help="queue to run on")
+    job_params.add_argument('--conda_env', type=str, default="", required=False,
+        help="name of conda environment to use for DAN")
+    job_params.add_argument('--workers', type=int, default=0, required=False,
+        help="number of workers to run DAN on concurrently")
     return parser.parse_args()
 
 
 def commandline_main():
     args = parseargs()
-    run_error_detection(args.pdb, args.map, args.reso, run_relax=args.relax)
+    MEM = 0
+    if args.scheduler:
+        MEM = 40
+        if not args.queue:
+            raise RuntimeError('set queue to run with scheduler')
+        if not args.conda_env:
+            raise RuntimeError('specify conda env to use for dask workers')
+        if not args.workers:
+            raise RuntimeError('specify number of workers to use with dask')
+    run_error_detection(args.pdb, args.map, args.reso, run_relax=args.relax,
+                        mem=MEM, conda_env=args.conda_env, 
+                        queue=args.queue, workers=args.workers)
     if not args.keep_intermediates:
         clean_dan_files(args.pdb)
 
