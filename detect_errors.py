@@ -16,7 +16,7 @@ import medic.medic_model
 import medic.broken_DAN as broken_DAN
 import medic.density_zscores as dens_zscores
 import medic.refine as refine
-from medic.util import extract_energy_table
+from medic.util import extract_energy_table, clean_dan_files
 from medic.pdb_io import read_pdb_file, write_pdb_file
 
 
@@ -114,12 +114,16 @@ def parseargs():
     parser.add_argument('--reso', type=float, required=True)
     parser.add_argument('--relax', action="store_true", default=False, 
         help="run a relax before hand, pass model to the error detection")
+    parser.add_argument('--keep_intermediates', action="store_true", default=False,
+        help="dont clean up temperorary files created for deepaccnet")
     return parser.parse_args()
 
 
 def commandline_main():
     args = parseargs()
     run_error_detection(args.pdb, args.map, args.reso, run_relax=args.relax)
+    if not args.keep_intermediates:
+        clean_dan_files(args.pdb)
 
 
 if __name__ == "__main__":

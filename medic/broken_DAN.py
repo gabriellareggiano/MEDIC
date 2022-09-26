@@ -6,17 +6,18 @@ import numpy as np
 import argparse
 import os
 import pandas as pd
-import subprocess
-from medic.pdb_io import read_pdb_file, write_pdb_file
-from medic.util import get_number_of_residues
 from more_itertools import consecutive_groups
-import shlex
 from time import sleep
 from math import ceil
 from copy import deepcopy
+import torch
+import sys
 
 from dask_jobqueue import SLURMCluster
 from dask.distributed import Client
+
+from medic.pdb_io import read_pdb_file, write_pdb_file
+from medic.util import get_number_of_residues
 
 
 def close_gaps(resi_list, min_gap):
@@ -105,17 +106,56 @@ def extract_region(pose, extract_resis, pdbinfo,
     return new_pose, keep_resis
 
 
-def run_DAN(script, pdb_file):
-    """ run DeepAccNet on provided pdb
-    """
-    # NOTE - if you change name below, you will need to change line 197, 'index = ...'
-    npz_file = pdb_file[:-4]+".npz"
-    python_path = "/software/conda/envs/tensorflow/bin/python"
-    cmd = f"{python_path} {script} --pdb {pdb_file} {npz_file}"
-    ret = subprocess.run(shlex.split(cmd))
-    if ret.returncode or not os.path.exists(npz_file):
-        raise RuntimeError(f"DeepAccNet failed on {pdb_file}: {cmd}")
-    return npz_file
+def run_dan(infilepath):
+    script_dir = os.path.dirname(os.path.dirname(__file__))
+    modelpath = os.path.join(script_dir,"DeepAccNet","models", "NatComm_standard")
+
+    import DeepAccNet.deepAccNet as dan
+
+    outfilepath = f"{infilepath[:-4]}.npz"
+    infolder = "/".join(infilepath.split("/")[:-1])
+    insamplename = infilepath.split("/")[-1][:-4]
+    outfolder = "/".join(outfilepath.split("/")[:-1])
+    outsamplename = outfilepath.split("/")[-1][:-4]
+    feature_file_name = os.path.join(outfolder, outsamplename+".features.npz")
+
+    # Process if file does not exists or reprocess flag is set
+    if (not os.path.isfile(feature_file_name)):
+        dan.process((os.path.join(infolder, insamplename+".pdb"),
+                            feature_file_name, False))
+        
+    if os.path.isfile(feature_file_name):
+        # Load pytorch model:
+        #model = dan.DeepAccNet()
+        model = dan.DeepAccNet(twobody_size = 33)
+        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        #model.load_state_dict(torch.load("models/regular_rep1/weights.pkl"))
+        model.load_state_dict(torch.load(os.path.join(modelpath, "best.pkl"), map_location=device)['model_state_dict'])
+        model.to(device)
+        model.eval()
+        
+        # Actual prediction
+        with torch.no_grad():
+            (idx, val), (f1d, bert), f2d, dmy = dan.getData(feature_file_name)
+            f1d = torch.Tensor(f1d).to(device)
+            f2d = torch.Tensor(np.expand_dims(f2d.transpose(2,0,1), 0)).to(device)
+            idx = torch.Tensor(idx.astype(np.int32)).long().to(device)
+            val = torch.Tensor(val).to(device)
+
+            estogram, mask, lddt, dmy = model(idx, val, f1d, f2d)
+            np.savez_compressed(outsamplename+".npz",
+                    lddt = lddt.cpu().detach().numpy().astype(np.float16),
+                    estogram = estogram.cpu().detach().numpy().astype(np.float16),
+                    mask = mask.cpu().detach().numpy().astype(np.float16))
+
+        dan.clean([outsamplename],
+                    outfolder,
+                    verbose=False,
+                    ensemble=False)
+    else:
+        print(f"Feature file does not exist: {feature_file_name}", file=sys.stderr)
+
+    return outfilepath
 
 
 def calc_lddts(pdbf, win_len, slide_len, neighborhood, 
@@ -167,7 +207,7 @@ def calc_lddts(pdbf, win_len, slide_len, neighborhood,
                 # NOTE - if you change name below you need to change line 197, 'index = ...'
                 ext_pdbf = f"{os.path.basename(pdbf)[:-4]}_r{resi:04d}.pdb" 
                 write_pdb_file(extracted_pose, ext_pdbf)
-                tasks.append(client.submit(run_DAN, script_loc, ext_pdbf))
+                tasks.append(client.submit(run_dan, ext_pdbf))
 
             # i think this might mean that all the lists 
             # i made for the next part are unnecessary or at least the indexing part is
@@ -225,3 +265,4 @@ def commandline_main():
 
 if __name__ == "__main__":
     commandline_main()
+

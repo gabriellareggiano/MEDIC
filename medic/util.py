@@ -2,7 +2,8 @@
 """
 import pandas as pd
 import medic.pose
-
+import os
+import glob
 
 def get_number_of_residues(pose: medic.pose.Pose) -> int:
     n = 0
@@ -120,3 +121,13 @@ def extract_energy_table(pdbf):
     energy_table = energy_table[~energy_table['label'].str.contains('VRT')]
     energy_table = energy_table.reset_index()
     return energy_table
+
+
+def clean_dan_files(input_file_name):
+    tmp_files = glob.glob(f"{input_file_name[:-4]}*_r[0-9][0-9][0-9][0-9].???")
+    for f in tmp_files:
+        try:
+            if os.path.isfile(f):
+                os.remove(f)
+        except:
+            print("Failed to clean for", f)
