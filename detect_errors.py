@@ -35,9 +35,7 @@ def compile_data(pdbf, mapf, reso,
                                 queue, workers)
     else: # run locally
         #TODO - have this return a series, not a df??
-        deepAccNet_scores = broken_DAN.calc_lddts(
-                                pdbf, WINDOW_LENGTH, 
-                                WINDOW_LENGTH, NEIGHBORHOOD)
+        deepAccNet_scores = broken_DAN.calc_lddts(pdbf, WINDOW_LENGTH, NEIGHBORHOOD)
     # NOTE - this naming convention comes from broken_DAN script
     data["lddt"] = deepAccNet_scores["lddt"]
 
@@ -46,6 +44,7 @@ def compile_data(pdbf, mapf, reso,
     eng_dat = extract_energy_table(pdbf)
     data["rama_prepro"] = eng_dat["rama_prepro"]
     data["cart_bonded"] = eng_dat["cart_bonded"]
+    data.to_csv("allscores.csv")
     return data
 
 
@@ -149,9 +148,11 @@ def commandline_main():
             raise RuntimeError('specify conda env to use for dask workers')
         if not args.workers:
             raise RuntimeError('specify number of workers to use with dask')
-    run_error_detection(args.pdb, args.map, args.reso, run_relax=args.relax,
+        run_error_detection(args.pdb, args.map, args.reso, run_relax=args.relax,
                         mem=MEM, conda_env=args.conda_env, 
                         queue=args.queue, workers=args.workers)
+    else:
+        run_error_detection(args.pdb, args.map, args.reso, run_relax=args.relax)
     if not args.keep_intermediates:
         clean_dan_files(args.pdb)
 
