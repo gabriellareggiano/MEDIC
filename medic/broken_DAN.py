@@ -16,7 +16,7 @@ import sys
 from medic.pdb_io import read_pdb_file, write_pdb_file
 from medic.util import get_number_of_residues
 import DeepAccNet.deepAccNet as dan
-print(dan.__file__)
+
 
 def close_gaps(resi_list, min_gap):
     """ after extracting nearby residues, want to make sure
@@ -126,7 +126,6 @@ def run_dan(infilepath):
         model = dan.DeepAccNet(twobody_size = 33)
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         #model.load_state_dict(torch.load("models/regular_rep1/weights.pkl"))
-        print(os.path.join(modelpath, "best.pkl"))
         model.load_state_dict(torch.load(os.path.join(modelpath, "best.pkl"), map_location=device)['model_state_dict'])
         model.to(device)
         model.eval()
@@ -140,8 +139,9 @@ def run_dan(infilepath):
             val = torch.Tensor(val).to(device)
 
             estogram, mask, lddt, dmy = model(idx, val, f1d, f2d)
+            lddt_cpu = lddt.cpu().detach().numpy().astype(np.float16)
             np.savez_compressed(outsamplename+".npz",
-                    lddt = lddt.cpu().detach().numpy().astype(np.float16),
+                    lddt = lddt_cpu,
                     estogram = estogram.cpu().detach().numpy().astype(np.float16),
                     mask = mask.cpu().detach().numpy().astype(np.float16))
 
@@ -152,7 +152,7 @@ def run_dan(infilepath):
     else:
         print(f"Feature file does not exist: {feature_file_name}", file=sys.stderr)
 
-    return lddt.cpu().detach().numpy().astype(np.float16)
+    return lddt_cpu
 
 
 def calc_lddts(pdbf, win_len, neighborhood):
@@ -172,11 +172,11 @@ def calc_lddts(pdbf, win_len, neighborhood):
             resi += 1
     full_results = pd.DataFrame.from_dict(pinf)
     full_results['lddt'] = np.nan
-    full_results.set_index('ros_resi', inplace=True)
 
     print(f'running tasks for DeepAccNet on processes')
+    indices_to_keep = list()
+    extracted_lddts = list()
     for resi in range(1, total_residues, win_len):
-        tmp_df = pd.DataFrame()
         end = resi+win_len
         if end >= total_residues:
             end = total_residues+1
@@ -185,18 +185,21 @@ def calc_lddts(pdbf, win_len, neighborhood):
         extracted_pose, new_resis = extract_region(full_pose,
                             main_residues, pinf,
                             neighborhood)
-        # NOTE - if you change name below you need to change line 197, 'index = ...'
+        indices_to_keep.append((new_resis.index(main_residues[0]),
+                            new_resis.index(main_residues[-1])))
         ext_pdbf = f"{os.path.basename(pdbf)[:-4]}_r{resi:04d}.pdb" 
         write_pdb_file(extracted_pose, ext_pdbf)
-        tmp_df['lddt'] = run_dan(ext_pdbf)
-        tmp_df.to_csv(f"{resi:03d}_lddts.csv")
-        tmp_df['ros_resi'] = new_resis
-        tmp_df.set_index('ros_resi', inplace=True)
-        full_results.loc[full_results.index.isin(main_residues), 'lddt'] = tmp_df.loc[tmp_df.index.isin(main_residues)]['lddt']
-        full_results.to_csv(f"full{resi:03d}.csv")
+        extracted_lddts.append(run_dan(ext_pdbf))
     
+    main_lddts = list()
+    for i,lddts in enumerate(extracted_lddts):
+        main_lddts.append(lddts[indices_to_keep[i][0]:indices_to_keep[i][1]+1])
+    main_lddts = np.concatenate(main_lddts)
+
+    full_results['lddt'] = main_lddts
+    full_results.to_csv("lddts.csv")
     print('all data collected')
-    return full_results.reset_index() # for combining with other results downstream
+    return full_results
 
 
 def calc_lddts_hpc(pdbf, win_len, slide_len, 
@@ -224,31 +227,27 @@ def calc_lddts_hpc(pdbf, win_len, slide_len,
 
     print('submitting tasks for DeepAccNet')
     tasks = list()
-    all_main_residues = list()
-    all_extracted_residues = list()
-    task_identifier = list()
+    indices_to_keep = list()
     with SLURMCluster(
         cores=1,
         memory=f"{mem}GB",
         queue=queue,
         walltime="01:00:00", # this should in theory by plenty of time
-        job_name=f"{os.path.basename(pdbf)[:4]}_DAN",
-        env_extra=[f"source activate {conda_env}"]
+        job_name=f"{os.path.basename(pdbf)[:4]}_DAN"
     ) as cluster:
         cluster.adapt(minimum=0, maximum=workers)
         with Client(cluster) as client:
-            for resi in range(1, total_residues, slide_len):
-                task_identifier.append(resi)
+            for resi in range(1, total_residues, win_len):
                 end = resi+win_len
                 if end >= total_residues:
                     end = total_residues+1
                 init_residues = list(range(resi,end))
-                main_residues = same_chain_and_stragglers(init_residues, pinf, slide_len)
-                all_main_residues.append(main_residues)
+                main_residues = same_chain_and_stragglers(init_residues, pinf, win_len)
                 extracted_pose, new_resis = extract_region(full_pose,
                                     main_residues, pinf,
                                     neighborhood)
-                all_extracted_residues.append(new_resis)
+                indices_to_keep.append((new_resis.index(main_residues[0]),
+                                   new_resis.index(main_residues[-1])))
                 # NOTE - if you change name below you need to change line 197, 'index = ...'
                 ext_pdbf = f"{os.path.basename(pdbf)[:-4]}_r{resi:04d}.pdb" 
                 write_pdb_file(extracted_pose, ext_pdbf)
@@ -257,27 +256,17 @@ def calc_lddts_hpc(pdbf, win_len, slide_len,
             print('gathering results')
             
             sleep(30) # before running any DAN tasks, wait a bit before reading pdbs
-            results = client.gather(tasks)
+            extracted_lddts = client.gather(tasks)
 
     sleep(30) # after closing client, wait a bit before trying to read files
     print('collecting data')
-    for result in results:
-        npz_data = np.load(result)
-        index = task_identifier.index(int(result.split('_')[-1][:-4].strip('r')))
-        curr_col = f"lddt_run{index:03d}"
-        df_data = pd.DataFrame.from_dict(npz_data["lddt"])
-        df_data["ros_resi"] = all_extracted_residues[index]
-        df_data.rename({0:'lddt'}, axis=1, inplace=True)
-        main_lddts = df_data[df_data['ros_resi'].isin(all_main_residues[index])]
-        if slide_len != win_len: # some overlap
-            full_results[curr_col] = full_results['ros_resi'].map(main_lddts.set_index('ros_resi')['lddt'])
-        else:
-            # i think this is dumb way to do this but i'm too lazy right now to find the better way
-            full_results['lddt'] = full_results['ros_resi'].map(main_lddts.set_index('ros_resi')['lddt']).fillna(full_results['lddt'])
+    main_lddts = list()
+    for i,lddts in enumerate(extracted_lddts):
+        main_lddts.append(lddts[indices_to_keep[i][0]:indices_to_keep[i][1]+1])
+    main_lddts = np.concatenate(main_lddts)
     
+    full_results['lddt'] = main_lddts
     print('all data collected')
-    if slide_len != win_len:
-        full_results["mean_lddt"] = full_results.filter(regex='lddt_run').mean(skipna=True, axis=1)
     return full_results
 
 
