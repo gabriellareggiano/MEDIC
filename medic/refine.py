@@ -11,14 +11,16 @@ def run(pdbf: str, mapf: str,
         input pose will be refined
     """
     flags = ['-ignore_unrecognized_res',
-            '-missing_density_to_jump',
-            '-cryst::crystal_refine',
-            '-beta',
-            '-beta_cart',
             '-default_max_cycles 200',
             f'-edensity::mapfile {mapf}',
             f'-edensity::mapreso {reso}']
-    pyrosetta.init(flags)
+    pyrosetta.init(' '.join(flags))
+    # this prevents downstream effects in subsequent pyrosetta protocols
+    pyrosetta.rosetta.basic.options.set_boolean_option("corrections:beta", True)
+    pyrosetta.rosetta.basic.options.set_boolean_option("corrections:beta_cart", True)
+    pyrosetta.rosetta.basic.options.set_boolean_option("in:missing_density_to_jump", True)
+    pyrosetta.rosetta.basic.options.set_boolean_option("cryst:crystal_refine", True)
+
     pose = pyrosetta.pose_from_file(pdbf)
 
     # set up scorefunction

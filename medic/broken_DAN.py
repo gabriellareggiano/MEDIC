@@ -1,5 +1,4 @@
 """ script to run DAN in smaller batches on a protein
-TODO - how to run this as part of git submodule
 """
 
 import numpy as np
@@ -16,7 +15,7 @@ import sys
 from medic.pdb_io import read_pdb_file, write_pdb_file
 from medic.util import get_number_of_residues
 import DeepAccNet.deepAccNet as dan
-
+import pyrosetta
 
 def close_gaps(resi_list, min_gap):
     """ after extracting nearby residues, want to make sure
@@ -30,9 +29,6 @@ def close_gaps(resi_list, min_gap):
         if abs(start - end) <= min_gap:
             for add_res in range(start+1,end):
                 new_resis.append(add_res)
-    # don't think i need this lol
-    # if len(new_resis) != len(resi_list):
-    #    return close_gaps(new_resis, min_gap=10)
     return sorted(new_resis)
 
 
@@ -156,6 +152,9 @@ def run_dan(infilepath):
 
 
 def calc_lddts(pdbf, win_len, neighborhood):
+    pyrosetta.init("-ex1 -ex2aro -constant_seed -read_only_ATOM_entries")
+    pyrosetta.rosetta.basic.options.set_boolean_option("corrections:beta", False)
+    pyrosetta.rosetta.basic.options.set_boolean_option("corrections:beta_cart", False)
     full_pose = read_pdb_file(pdbf)
     pinf = {"resn": list(),
             "resi": list(),
@@ -197,17 +196,18 @@ def calc_lddts(pdbf, win_len, neighborhood):
     main_lddts = np.concatenate(main_lddts)
 
     full_results['lddt'] = main_lddts
-    full_results.to_csv("lddts.csv")
     print('all data collected')
     return full_results
 
 
-def calc_lddts_hpc(pdbf, win_len, slide_len, 
-                neighborhood, mem, 
-                conda_env, queue, workers):
+def calc_lddts_hpc(pdbf, win_len,neighborhood, 
+                mem, queue, workers):
     from dask_jobqueue import SLURMCluster
     from dask.distributed import Client
 
+    pyrosetta.init("-ex1 -ex2aro -constant_seed -read_only_ATOM_entries")
+    pyrosetta.rosetta.basic.options.set_boolean_option("corrections:beta", False)
+    pyrosetta.rosetta.basic.options.set_boolean_option("corrections:beta_cart", False)
     full_pose = read_pdb_file(pdbf)
     pinf = {"resn": list(),
             "resi": list(),
@@ -280,16 +280,14 @@ def parseargs():
     dan_params.add_argument('--neighborhood', type=float, default=20.0)
     job_params.add_argument('--queue', type=str, default='dimaio')
     job_params.add_argument('--memory', type=int, default=40)
-    job_params.add_argument('--conda_env', type=str, default="")
     job_params.add_argument('--num_workers', type=int, default=100)
     return parser.parse_args()
 
 
 def commandline_main():
     args = parseargs()
-    df = calc_lddts_hpc(args.pdb, args.window_length, 
-        args.sliding_length, args.neighborhood, 
-        args.memory, args.conda_env, args.queue, args.num_workers)
+    df = calc_lddts_hpc(args.pdb, args.window_length, args.neighborhood, 
+        args.memory, args.queue, args.num_workers)
     df.to_csv(f"{os.path.basename(args.pdb)[:4]}_DAN.csv")
 
 

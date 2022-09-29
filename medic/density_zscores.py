@@ -12,15 +12,15 @@ def run(pdbf: str, mapf: str, reso: float) -> pd.DataFrame:
     """
     atom_mask = 3.2
     flags = ['-ignore_unrecognized_res',
-            '-beta',
-            '-beta_cart',
             '-default_max_cycles 200',
             f'-edensity::atom_mask {atom_mask}',
             f'-edensity::atom_mask_min {atom_mask}',
             f'-edensity::mapfile {mapf}',
             f'-edensity::mapreso {reso}']
-    pyrosetta.init(flags)
-
+    pyrosetta.init(' '.join(flags))
+    # this prevents downstream effects in subsequent pyrosetta protocols
+    pyrosetta.rosetta.basic.options.set_boolean_option("corrections:beta", True)
+    pyrosetta.rosetta.basic.options.set_boolean_option("corrections:beta_cart", True)
     pose = pyrosetta.pose_from_file(pdbf)
 
     setupdens_mover = pyrosetta.rosetta.protocols.electron_density.SetupForDensityScoringMover()
