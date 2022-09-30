@@ -15,16 +15,13 @@ def run(pdbf: str, mapf: str,
             f'-edensity::mapfile {mapf}',
             f'-edensity::mapreso {reso}']
     pyrosetta.init(' '.join(flags))
-    # this prevents downstream effects in subsequent pyrosetta protocols
-    pyrosetta.rosetta.basic.options.set_boolean_option("corrections:beta", True)
-    pyrosetta.rosetta.basic.options.set_boolean_option("corrections:beta_cart", True)
     pyrosetta.rosetta.basic.options.set_boolean_option("in:missing_density_to_jump", True)
     pyrosetta.rosetta.basic.options.set_boolean_option("cryst:crystal_refine", True)
 
     pose = pyrosetta.pose_from_file(pdbf)
 
     # set up scorefunction
-    sf = pyrosetta.create_score_function("beta_genpot_cart")
+    sf = pyrosetta.create_score_function("ref2015_cart")
     score_manager = pyrosetta.rosetta.core.scoring.ScoreTypeManager()
     dens_scterm = score_manager.score_type_from_name("elec_dens_fast")
     sf.set_weight(dens_scterm, 50.0)
@@ -61,6 +58,8 @@ def run(pdbf: str, mapf: str,
     local_relax_mover.apply(pose)
     bfacfit_mover.apply(pose)
 
+    # score pose with sf so etable is updated
+    score = sf(pose)
     pose.dump_pdb(out_pdb)
 
 
