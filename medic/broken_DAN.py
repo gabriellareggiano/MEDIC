@@ -32,7 +32,7 @@ def close_gaps(resi_list, min_gap):
     return sorted(new_resis)
 
 
-def same_chain_and_stragglers(residues, pinf, slide_len):
+def same_chain_and_stragglers(residues, pinf, slide_len, seen):
     """ make sure our main chain of residues is not split between chains
         and to also pick up any stragglers if they are just beyond the sliding dist
         i think the logic here is more complicated than it needs to be..........
@@ -49,11 +49,15 @@ def same_chain_and_stragglers(residues, pinf, slide_len):
         elif pinf["ros_resi"][brk] < residues[0] and \
           residues[0] - pinf["ros_resi"][brk] <= ceil(slide_len/2):
             for ri in range(pinf["ros_resi"][brk], residues[0]):
-                new_residues.append(ri)
+                if seen[ri] == 0:
+                    new_residues.append(ri)
         elif pinf["ros_resi"][brk] > residues[-1] and \
           pinf["ros_resi"][brk] - residues[-1] <= ceil(slide_len/2):
             for ri in range(residues[-1]+1, pinf["ros_resi"][brk]):
-                new_residues.append(ri)
+                if seen[ri] == 0:
+                    new_residues.append(ri)
+    for ri in new_residues:
+        seen[ri] = 1
     return sorted(new_residues)
 
 
@@ -162,12 +166,14 @@ def calc_lddts(pdbf, win_len, neighborhood):
             "ros_resi": list() }
     total_residues = get_number_of_residues(full_pose)
     resi = 1
+    seen_residues = dict()
     for ch in full_pose.chains:
         for grp in ch.groups:
             pinf["resn"].append(grp.groupName)
             pinf["resi"].append(grp.groupNumber)
             pinf["chID"].append(ch.ID)
             pinf["ros_resi"].append(resi)
+            seen_residues[resi] = 0
             resi += 1
     full_results = pd.DataFrame.from_dict(pinf)
     full_results['lddt'] = np.nan
@@ -180,7 +186,7 @@ def calc_lddts(pdbf, win_len, neighborhood):
         if end >= total_residues:
             end = total_residues+1
         init_residues = list(range(resi,end))
-        main_residues = same_chain_and_stragglers(init_residues, pinf, win_len)
+        main_residues = same_chain_and_stragglers(init_residues, pinf, win_len, seen_residues)
         extracted_pose, new_resis = extract_region(full_pose,
                             main_residues, pinf,
                             neighborhood)
