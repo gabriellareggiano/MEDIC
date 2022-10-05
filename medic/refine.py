@@ -17,6 +17,8 @@ def run(pdbf: str, mapf: str,
     pyrosetta.init(' '.join(flags))
     pyrosetta.rosetta.basic.options.set_boolean_option("in:missing_density_to_jump", True)
     pyrosetta.rosetta.basic.options.set_boolean_option("cryst:crystal_refine", True)
+    pyrosetta.rosetta.basic.options.set_boolean_option("corrections:shapovalov_lib_fixes_enable", True)
+    pyrosetta.rosetta.basic.options.set_file_option("corrections:score:rama_pp_map","scoring/score_functions/rama/fd_beta_nov2016")
 
     pose = pyrosetta.pose_from_file(pdbf)
 

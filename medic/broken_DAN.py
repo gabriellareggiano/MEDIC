@@ -157,8 +157,10 @@ def run_dan(infilepath):
 
 def calc_lddts(pdbf, win_len, neighborhood):
     pyrosetta.init("-ex1 -ex2aro -constant_seed -read_only_ATOM_entries")
-    pyrosetta.rosetta.basic.options.set_boolean_option("corrections:beta", False)
-    pyrosetta.rosetta.basic.options.set_boolean_option("corrections:beta_cart", False)
+    pyrosetta.rosetta.basic.options.set_boolean_option("in:missing_density_to_jump", False)
+    pyrosetta.rosetta.basic.options.set_boolean_option("cryst:crystal_refine", False)
+    pyrosetta.rosetta.basic.options.set_boolean_option("corrections:shapovalov_lib_fixes_enable", False)
+    pyrosetta.rosetta.basic.options.set_file_option("corrections:score:rama_pp_map","scoring/score_functions/rama/fd")
     full_pose = read_pdb_file(pdbf)
     pinf = {"resn": list(),
             "resi": list(),
