@@ -146,8 +146,13 @@ def commandline_main():
         errors = run_error_detection(args.pdb, args.map, args.reso, run_relax=args.relax)
     if not args.keep_intermediates:
         clean_dan_files(args.pdb)
-    error_dict_summary = analyze.collect_error_info()
-    error_summary = analyze.get_error_string()
+    prob_column = "error_probability"
+    high_error_threshold = 0.78
+    low_error_threshold = 0.60
+    error_dict_summary = analyze.collect_error_info(errors, prob_column, low_error_threshold)
+    error_summary = analyze.get_error_string(error_dict_summary, 
+                        high_error_threshold, 
+                        low_error_threshold)
     with open("MEDIC_summary.txt", 'w') as f:
         f.write(error_summary)
     print(error_summary)
