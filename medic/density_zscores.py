@@ -11,7 +11,8 @@ def run(pdbf: str, mapf: str, reso: float) -> pd.DataFrame:
     use setup for dens boolean if density scoring not done previously on pose
     """
     atom_mask = 3.2
-    flags = ['-ignore_unrecognized_res',
+    flags = ['-mute all',
+            '-ignore_unrecognized_res',
             '-default_max_cycles 200',
             f'-edensity::mapfile {mapf}',
             f'-edensity::mapreso {reso}']

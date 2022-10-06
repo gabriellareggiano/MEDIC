@@ -155,7 +155,7 @@ def run_dan(infilepath):
     return lddt_cpu
 
 
-def calc_lddts(pdbf, win_len, neighborhood):
+def calc_lddts(pdbf, win_len, neighborhood, verbose=False):
     pyrosetta.init("-ex1 -ex2aro -constant_seed -read_only_ATOM_entries")
     pyrosetta.rosetta.basic.options.set_boolean_option("in:missing_density_to_jump", False)
     pyrosetta.rosetta.basic.options.set_boolean_option("cryst:crystal_refine", False)
@@ -180,7 +180,7 @@ def calc_lddts(pdbf, win_len, neighborhood):
     full_results = pd.DataFrame.from_dict(pinf)
     full_results['lddt'] = np.nan
 
-    print(f'running tasks for DeepAccNet on processes')
+    if verbose: print(f'running tasks for DeepAccNet on processes')
     indices_to_keep = list()
     extracted_lddts = list()
     for resi in range(1, total_residues, win_len):
@@ -204,16 +204,15 @@ def calc_lddts(pdbf, win_len, neighborhood):
     main_lddts = np.concatenate(main_lddts)
 
     full_results['lddt'] = main_lddts
-    print('all data collected')
+    if verbose: print('all data collected')
     return full_results
 
 
 def calc_lddts_hpc(pdbf, win_len,neighborhood, 
-                mem, queue, workers):
+                mem, queue, workers, verbose=False):
     from dask_jobqueue import SLURMCluster
     from dask.distributed import Client
-
-    pyrosetta.init("-ex1 -ex2aro -constant_seed -read_only_ATOM_entries")
+    pyrosetta.init("-ex1 -ex2aro -constant_seed -read_only_ATOM_entries -mute all")
     pyrosetta.rosetta.basic.options.set_boolean_option("corrections:beta", False)
     pyrosetta.rosetta.basic.options.set_boolean_option("corrections:beta_cart", False)
     full_pose = read_pdb_file(pdbf)
@@ -233,7 +232,7 @@ def calc_lddts_hpc(pdbf, win_len,neighborhood,
     full_results = pd.DataFrame.from_dict(pinf)
     full_results['lddt'] = np.nan
 
-    print('submitting tasks for DeepAccNet')
+    if verbose: print('submitting tasks for DeepAccNet')
     tasks = list()
     indices_to_keep = list()
     with SLURMCluster(
@@ -261,20 +260,20 @@ def calc_lddts_hpc(pdbf, win_len,neighborhood,
                 write_pdb_file(extracted_pose, ext_pdbf)
                 tasks.append(client.submit(run_dan, ext_pdbf))
 
-            print('gathering results')
+            if verbose: print('gathering results')
             
             sleep(30) # before running any DAN tasks, wait a bit before reading pdbs
             extracted_lddts = client.gather(tasks)
 
     sleep(30) # after closing client, wait a bit before trying to read files
-    print('collecting data')
+    if verbose: print('collecting data')
     main_lddts = list()
     for i,lddts in enumerate(extracted_lddts):
         main_lddts.append(lddts[indices_to_keep[i][0]:indices_to_keep[i][1]+1])
     main_lddts = np.concatenate(main_lddts)
     
     full_results['lddt'] = main_lddts
-    print('all data collected')
+    if verbose: print('all data collected')
     return full_results
 
 

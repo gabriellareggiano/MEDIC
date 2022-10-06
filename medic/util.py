@@ -5,6 +5,7 @@ import medic.pose
 import os
 import glob
 
+
 def get_number_of_residues(pose: medic.pose.Pose) -> int:
     n = 0
     for chain in pose.chains:
@@ -131,3 +132,18 @@ def clean_dan_files(input_file_name):
                 os.remove(f)
         except:
             print("Failed to clean for", f)
+
+
+def clean_pdb(pdbf):
+    compatible_res = ["ALA", "ARG", "ASN", "ASP", "CYS", "GLU",
+             "GLN", "GLY", "HIS", "ILE", "LEU", "LYS",
+             "MET", "PHE", "PRO", "SER", "THR", "TRP",
+             "TYR", "VAL"]
+    with open(pdbf, 'r') as f:
+        pdb_lines = [line.strip() for line in f.readlines()
+                    if line[:4] == "ATOM" and line[17:21].strip() in compatible_res]
+    new_pdb = pdbf[:-4]+"_clean.pdb"
+    with open(new_pdb, 'w') as f:
+        f.write('\n'.join(pdb_lines))
+    return new_pdb
+    

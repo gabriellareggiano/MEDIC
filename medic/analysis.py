@@ -1,6 +1,7 @@
-import pandas as pd
 from math import exp
 import importlib.resources as pkg_resources
+import pandas as pd
+
 import medic.medic_model
 
 # arguments are given in the same order as the model_params file
@@ -40,21 +41,27 @@ def calculate_contributions(scores, thres):
     scores['dens_geo_probability'] = scores.apply(lambda row: calc_prob(row['perResZDensWin1'], row['perResZDensWin3'], lddt_mean,
                                                                         row['rama_prepro'], row['cart_bonded']), axis=1)
 
-    scores['contributing_factors'] = ""
-    scores.loc[scores['only_lddt_probability'] >= thres, 'contributing_factors'] = 'lddt'
-    scores.loc[scores['only_dens_probability'] >= thres, 'contributing_factors'] = 'density'
-    scores.loc[scores['only_geo_probability'] >= thres, 'contributing_factors'] = 'geometry'
+    scores['contributing_factors'] = "none"
+    scores.loc[(scores['only_lddt_probability'] >= thres)
+                & (scores['contributing_factors'].str.match("none")), 'contributing_factors'] = 'lddt'
+    scores.loc[(scores['only_dens_probability'] >= thres)
+                & (scores['contributing_factors'].str.match("none")), 'contributing_factors'] = 'density'
+    scores.loc[(scores['only_geo_probability'] >= thres)
+                & (scores['contributing_factors'].str.match("none")), 'contributing_factors'] = 'geometry'
     scores.loc[(scores['lddt_dens_probability'] >= thres) 
                     & (scores['only_lddt_probability'] < thres) 
-                    & (scores['only_dens_probability'] < thres), 'contributing_factors'] = 'lddt + density'
+                    & (scores['only_dens_probability'] < thres)
+                    & (scores['contributing_factors'].str.match("none")), 'contributing_factors'] = 'lddt + density'
     scores.loc[(scores['lddt_geo_probability'] >= thres) 
                     & (scores['only_lddt_probability'] < thres) 
-                    & (scores['only_geo_probability'] < thres), 'contributing_factors'] = 'lddt + geometry'
+                    & (scores['only_geo_probability'] < thres)
+                    & (scores['contributing_factors'].str.match("none")), 'contributing_factors'] = 'lddt + geometry'
     scores.loc[(scores['dens_geo_probability'] >= thres) 
                     & (scores['only_dens_probability'] < thres)  
-                    & (scores['only_geo_probability'] < thres), 'contributing_factors'] = 'density + geometry'
-    scores.loc[scores['contributing_factors'].str.match(""), 'contributing_factors'] = 'all scores'
-
+                    & (scores['only_geo_probability'] < thres)
+                    & (scores['contributing_factors'].str.match("none")), 'contributing_factors'] = 'density + geometry'
+    scores.loc[scores['contributing_factors'].str.match("none"), 'contributing_factors'] = 'lddt + density + geometry'
+    scores.to_csv("test_analysis.csv")
     scores.drop(inplace=True, axis=1,
                     columns=['only_lddt_probability',
                             'only_dens_probability',
@@ -63,43 +70,72 @@ def calculate_contributions(scores, thres):
                             'lddt_geo_probability',
                             'dens_geo_probability'])
     return scores
-                                     
+
+
+def get_group_contributors(df):
+    vals = list(df['contributing_factors'].unique())
+    final = set()
+    for v in vals:
+        subs = [ x.strip() for x in v.split('+') if x.strip() not in final]
+        for s in subs:
+            final.add(s)
+    final = sorted(list(final))
+    return ' + '.join(final)
+
 
 def collect_error_info(scores, prob_coln, thres):
-    scores_breakdown = calculate_contributions(scores)
+    scores_breakdown = calculate_contributions(scores, thres)
+    # group by error segment and chain ID (chain id will break up mistakes across chains)
     scores_breakdown['error'] = scores_breakdown[prob_coln] >= thres
-    scores_breakdown['streak_id'] = (scores_breakdown['error'] != scores['error'].shift(1)).cumsum()
+    scores_breakdown['streak_id'] = (scores_breakdown['error'] != scores_breakdown['error'].shift(1)).cumsum()
     errors = scores_breakdown.loc[(scores_breakdown['error'] == True)]
     grperrors = errors.groupby(['streak_id', 'chID'])
-    avg = grperrors.mean()['error_probability']
-    first = grperrors.first().reset_index()
-    last = grperrors.last().reset_index()
-                                     
-    info = {"res_start": [],
-                    "res_end": [],
-                    "chID": [],
-                    "avg_error_prob": [],
-                    "contributing": []}
-    #TODO - better way than with iterrows?
-    for i,row in first.iterrows():
-        info['res_start'].append(row['resi'])
-        info['res_end'].append(last.at[i,'resi'])
-        info['chID'].append(row['chID'])
-        info['avg_error_prob'].append(avg.at[i,'prob'])
-        info['contributing'].append(row['contributing_factors'])
-     
-    return info
-        
+
+    # collect important information about segments
+    segment_info = pd.DataFrame()
+    segment_info['res_start'] = grperrors.first().reset_index()['resi']
+    segment_info['res_end'] = grperrors.last().reset_index()['resi']
+    segment_info['chID'] = grperrors.first().reset_index()['chID']
+    segment_info['avg_error_prob'] = grperrors.mean()[prob_coln].reset_index()[prob_coln]
+    segment_info['contribution'] = grperrors.apply(get_group_contributors).reset_index()[0]
+    return segment_info
+
+
+def get_seg_str(start, end, chain, prob, contr, high_thres, low_thres):
+    err_type = ""
+    if prob >= high_thres:
+        err_type = "definite"
+    elif low_thres <= prob < high_thres:
+        err_type = "possible"
+    seg_str = ""
+    if start == end:
+        seg_str = f"{start}{chain}"
+    else:
+        seg_str = f"{start}{chain} - {end}{chain}"
+    return f"{seg_str}, {err_type} error\n\tcauses: {contr}"
+
                                      
 def get_error_report_str(info, high_thres, low_thres):
-    error_strs = []
-    for st,end,ch,errp,cont in zip(info['res_start'], info['res_end'],
-                                                             info['chID'], info['avg_error_prob'],
-                                                             info['contributing']):
-        if errp >= high_thres:
-            error_type = "definite"
-        elif errp < high_thres and errp >= low_thres:
-            error_type = "possible"
-        error_strs.append(f"{st}{ch} - {end}{ch}, {error_type} error, causes: {cont}")
-    return "\n".join(error_strs)
+    error_strs = '\n\n'.join(
+                    info.apply(
+                        lambda row: get_seg_str(row['res_start'], row['res_end'], 
+                                                row['chID'], row['avg_error_prob'],
+                                                row['contribution'],
+                                                high_thres, low_thres), axis=1))
+    return error_strs
         
+
+# for debugging
+def commandline_main():
+    import sys
+
+    data = pd.read_csv(sys.argv[1])
+    info = collect_error_info(data, "error_probability", 0.60)
+    summary = get_error_report_str(info, 0.78, 0.60)
+    print('------------------------- ERROR SUMMARY -------------------------')
+    print(summary)
+    print('-----------------------------------------------------------------')
+
+
+if __name__ == "__main__":
+    commandline_main()

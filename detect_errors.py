@@ -17,22 +17,25 @@ import medic.broken_DAN as broken_DAN
 import medic.density_zscores as dens_zscores
 import medic.refine as refine
 import medic.analysis as analyze
-from medic.util import extract_energy_table, clean_dan_files
+from medic.util import extract_energy_table, clean_dan_files, clean_pdb
 from medic.pdb_io import read_pdb_file, write_pdb_file
 
-def compile_data(pdbf, mapf, reso,
+def compile_data(pdbf, mapf, reso, verbose=False,
         mem=0, queue="", workers=0):
-    print('calculating zscores')
+    if verbose: print('calculating zscores')
     data = dens_zscores.run(pdbf, mapf, reso)
 
     WINDOW_LENGTH = 20
     NEIGHBORHOOD = 20
-    print('calculating predicted lddts')
+    if verbose: print('calculating predicted lddts')
     if mem and queue and workers:
         deepAccNet_scores = broken_DAN.calc_lddts_hpc(pdbf, WINDOW_LENGTH,
-                                NEIGHBORHOOD, mem, queue, workers)
+                                NEIGHBORHOOD,
+                                mem, queue, workers,
+                                verbose=verbose)
     else: # run locally
-        deepAccNet_scores = broken_DAN.calc_lddts(pdbf, WINDOW_LENGTH, NEIGHBORHOOD)
+        deepAccNet_scores = broken_DAN.calc_lddts(pdbf, WINDOW_LENGTH, 
+                                NEIGHBORHOOD, verbose=verbose)
     # NOTE - this naming convention comes from broken_DAN script
     data["lddt"] = deepAccNet_scores["lddt"]
 
@@ -83,29 +86,29 @@ def set_pred_as_bfac(pdbf, predictions, prob_coln):
     write_pdb_file(pose, new_pdbf)
 
 
-def run_error_detection(pdbf, mapf, reso, run_relax=False,
+def run_error_detection(pdbf, mapf, reso, run_relax=False, verbose=False,
                 mem=0, queue="", workers=0):
     if run_relax:
         refined_pdb = f"{pdbf[:-4]}_refined.pdb"
-        print("running local relax")
+        if verbose: print("running local relax")
         refine.run(pdbf, mapf, reso, refined_pdb)
         pdbf = refined_pdb
 
-    print("collecting scores")
-    dat = compile_data(pdbf, mapf, reso, 
+    if verbose: print("collecting scores")
+    dat = compile_data(pdbf, mapf, reso, verbose=verbose,
                     mem=mem, queue=queue, workers=workers)
 
-    print('loading statistical model')
+    if verbose: print('loading statistical model')
     loaded_model = pickle.load(pkg_resources.open_binary(medic.medic_model, 'model.sav'))
 
-    print('predicting errors')
+    if verbose: print('predicting errors')
     prob_coln = "error_probability"
     err_pred = get_probabilities(dat, loaded_model, prob_coln)
     err_pred.to_csv(f"{os.path.basename(pdbf)[:-4]}_MEDIC_predictions.csv")
 
-    print('adding labels to bfactor in pdbs')
+    if verbose: print('adding labels to bfactor in pdbs')
     set_pred_as_bfac(pdbf, err_pred, prob_coln)
-    print('finished')
+
     return err_pred
 
 
@@ -116,10 +119,14 @@ def parseargs():
     err_params.add_argument('--pdb', type=str, required=True)
     err_params.add_argument('--map', type=str, required=True)
     err_params.add_argument('--reso', type=float, required=True)
+    err_params.add_argument('--clean', action="store_true", default=False,
+        help="clean the pdb before running (remove HETATMS/noncanonicals)")
     err_params.add_argument('--relax', action="store_true", default=False, 
         help="run a relax before hand, pass model to the error detection")
     err_params.add_argument('--keep_intermediates', action="store_true", default=False,
         help="dont clean up temperorary files created for deepaccnet")
+    err_params.add_argument('-v','--verbose', action="store_true", default=False,
+        help="print extra updates")
     err_params.add_argument('-j', '--processors', type=int, required=False, default=1,
         help='number processors to use if running locally')
     job_params.add_argument('--scheduler', action="store_true", default=False,
@@ -133,7 +140,11 @@ def parseargs():
 
 def commandline_main():
     args = parseargs()
+
+    # set up and run
     MEM = 0
+    if args.clean:
+        args.pdb = clean_pdb(args.pdb)
     if args.scheduler:
         MEM = 40
         if not args.queue:
@@ -141,21 +152,28 @@ def commandline_main():
         if not args.workers:
             raise RuntimeError('specify number of workers to use with dask')
         errors = run_error_detection(args.pdb, args.map, args.reso, run_relax=args.relax,
-                        mem=MEM, queue=args.queue, workers=args.workers)
+                        mem=MEM, queue=args.queue, workers=args.workers, verbose=args.verbose)
     else:
-        errors = run_error_detection(args.pdb, args.map, args.reso, run_relax=args.relax)
-    if not args.keep_intermediates:
-        clean_dan_files(args.pdb)
-    prob_column = "error_probability"
+        errors = run_error_detection(args.pdb, args.map, args.reso, 
+                        run_relax=args.relax, verbose=args.verbose)
+    
+    # analysis
+    prob_coln = "error probability" # this is defined in two places ugly
     high_error_threshold = 0.78
     low_error_threshold = 0.60
-    error_dict_summary = analyze.collect_error_info(errors, prob_column, low_error_threshold)
-    error_summary = analyze.get_error_string(error_dict_summary, 
+    if args.verbose: print('calculating score contributions')
+    error_dict_summary = analyze.collect_error_info(errors, prob_coln, low_error_threshold)
+    error_summary = analyze.get_error_report_str(error_dict_summary, 
                         high_error_threshold, 
                         low_error_threshold)
     with open("MEDIC_summary.txt", 'w') as f:
         f.write(error_summary)
+    print('\n\n')
+    print('------------------------- ERROR SUMMARY -------------------------')
     print(error_summary)
+    print('-----------------------------------------------------------------')
+    if not args.keep_intermediates:
+        clean_dan_files(args.pdb)
 
     
 if __name__ == "__main__":

@@ -10,7 +10,8 @@ def run(pdbf: str, mapf: str,
         refinement is three steps: cart min, local relax, bfactor fitting
         input pose will be refined
     """
-    flags = ['-ignore_unrecognized_res',
+    flags = ['-mute all',
+            '-ignore_unrecognized_res',
             '-default_max_cycles 200',
             f'-edensity::mapfile {mapf}',
             f'-edensity::mapreso {reso}']
