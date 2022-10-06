@@ -27,17 +27,17 @@ def calculate_contributions(scores, thres):
     zdens3_mean = -0.6072111874018266
     rama_mean = 0.19317735155421467
     cart_mean = 0.8337395547340672
-    scores['only_lddt_probability'] = scores.apply(lamba row: calc_prob(zdens1_mean, zdens3_mean,
+    scores['only_lddt_probability'] = scores.apply(lambda row: calc_prob(zdens1_mean, zdens3_mean,
                                                                         row['lddt'], rama_mean, cart_mean), axis=1)
-    scores['only_dens_probability'] = scores.apply(lamba row: calc_prob(row['perResZDensWin1'], row['perResZDensWin3'],
+    scores['only_dens_probability'] = scores.apply(lambda row: calc_prob(row['perResZDensWin1'], row['perResZDensWin3'],
                                                                         lddt_mean, rama_mean, cart_mean), axis=1)
-    scores['only_geo_probability'] = scores.apply(lamba row: calc_prob(zdens1_mean, zdens3_mean, lddt_mean,
+    scores['only_geo_probability'] = scores.apply(lambda row: calc_prob(zdens1_mean, zdens3_mean, lddt_mean,
                                                                         row['rama_prepro'], row['cart_bonded']), axis=1)
-    scores['lddt_dens_probability'] = scores.apply(lamba row: calc_prob(row['perResZDensWin1'], row['perResZDensWin3'],
+    scores['lddt_dens_probability'] = scores.apply(lambda row: calc_prob(row['perResZDensWin1'], row['perResZDensWin3'],
                                                                         row['lddt'], rama_mean, cart_mean), axis=1) 
-    scores['lddt_geo_probability'] = scores.apply(lamba row: calc_prob(zdens1_mean, zdens3_mean, row['lddt'],
+    scores['lddt_geo_probability'] = scores.apply(lambda row: calc_prob(zdens1_mean, zdens3_mean, row['lddt'],
                                                                         row['rama_prepro'], row['cart_bonded']), axis=1)
-    scores['dens_geo_probability'] = scores.apply(lamba row: calc_prob(row['perResZDensWin1'], row['perResZDensWin3'], lddt_mean,
+    scores['dens_geo_probability'] = scores.apply(lambda row: calc_prob(row['perResZDensWin1'], row['perResZDensWin3'], lddt_mean,
                                                                         row['rama_prepro'], row['cart_bonded']), axis=1)
 
     scores['contributing_factors'] = ""
