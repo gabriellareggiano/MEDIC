@@ -16,6 +16,7 @@ import medic.medic_model
 import medic.broken_DAN as broken_DAN
 import medic.density_zscores as dens_zscores
 import medic.refine as refine
+import medic.analysis as analyze
 from medic.util import extract_energy_table, clean_dan_files
 from medic.pdb_io import read_pdb_file, write_pdb_file
 
@@ -105,6 +106,7 @@ def run_error_detection(pdbf, mapf, reso, run_relax=False,
     print('adding labels to bfactor in pdbs')
     set_pred_as_bfac(pdbf, err_pred, prob_coln)
     print('finished')
+    return err_pred
 
 
 def parseargs():
@@ -138,13 +140,23 @@ def commandline_main():
             raise RuntimeError('set queue to run with scheduler')
         if not args.workers:
             raise RuntimeError('specify number of workers to use with dask')
-        run_error_detection(args.pdb, args.map, args.reso, run_relax=args.relax,
+        errors = run_error_detection(args.pdb, args.map, args.reso, run_relax=args.relax,
                         mem=MEM, queue=args.queue, workers=args.workers)
     else:
-        run_error_detection(args.pdb, args.map, args.reso, run_relax=args.relax)
+        errors = run_error_detection(args.pdb, args.map, args.reso, run_relax=args.relax)
     if not args.keep_intermediates:
         clean_dan_files(args.pdb)
+    prob_column = "error_probability"
+    high_error_threshold = 0.78
+    low_error_threshold = 0.60
+    error_dict_summary = analyze.collect_error_info(errors, prob_column, low_error_threshold)
+    error_summary = analyze.get_error_string(error_dict_summary, 
+                        high_error_threshold, 
+                        low_error_threshold)
+    with open("MEDIC_summary.txt", 'w') as f:
+        f.write(error_summary)
+    print(error_summary)
 
-
+    
 if __name__ == "__main__":
     commandline_main()
