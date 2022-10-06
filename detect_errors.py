@@ -63,7 +63,6 @@ def get_feature_order():
 def get_probabilities(df, model, prob_coln):
     order = get_feature_order()
     data = df[order]
-    print('predicting probabilities')
     probabilities = model.predict_proba(data)
     df[prob_coln] = probabilities[:,1]
     return df
@@ -86,14 +85,8 @@ def set_pred_as_bfac(pdbf, predictions, prob_coln):
     write_pdb_file(pose, new_pdbf)
 
 
-def run_error_detection(pdbf, mapf, reso, run_relax=False, verbose=False,
+def run_error_detection(pdbf, mapf, reso, verbose=False,
                 mem=0, queue="", workers=0):
-    if run_relax:
-        refined_pdb = f"{pdbf[:-4]}_refined.pdb"
-        if verbose: print("running local relax")
-        refine.run(pdbf, mapf, reso, refined_pdb)
-        pdbf = refined_pdb
-
     if verbose: print("collecting scores")
     dat = compile_data(pdbf, mapf, reso, verbose=verbose,
                     mem=mem, queue=queue, workers=workers)
@@ -104,31 +97,28 @@ def run_error_detection(pdbf, mapf, reso, run_relax=False, verbose=False,
     if verbose: print('predicting errors')
     prob_coln = "error_probability"
     err_pred = get_probabilities(dat, loaded_model, prob_coln)
-    err_pred.to_csv(f"{os.path.basename(pdbf)[:-4]}_MEDIC_predictions.csv")
-
-    if verbose: print('adding labels to bfactor in pdbs')
-    set_pred_as_bfac(pdbf, err_pred, prob_coln)
 
     return err_pred
 
 
 def parseargs():
     parser = argparse.ArgumentParser()
-    err_params = parser.add_argument_group('Inputs')
+    inp_params = parser.add_argument_group('Inputs')
+    options = parser.add_argument_group("Options")
     job_params = parser.add_argument_group('Running DeepAccNet on HPC')
-    err_params.add_argument('--pdb', type=str, required=True)
-    err_params.add_argument('--map', type=str, required=True)
-    err_params.add_argument('--reso', type=float, required=True)
-    err_params.add_argument('--clean', action="store_true", default=False,
+    inp_params.add_argument('--pdb', type=str, required=True)
+    inp_params.add_argument('--map', type=str, required=True)
+    inp_params.add_argument('--reso', type=float, required=True)
+    options.add_argument('--clean', action="store_true", default=False,
         help="clean the pdb before running (remove HETATMS/noncanonicals)")
-    err_params.add_argument('--relax', action="store_true", default=False, 
-        help="run a relax before hand, pass model to the error detection")
-    err_params.add_argument('--keep_intermediates', action="store_true", default=False,
+    options.add_argument('--skip_relax', action="store_true", default=False, 
+        help="skip the relax step, only do this if your pdb is from Rosetta")
+    options.add_argument('--keep_intermediates', action="store_true", default=False,
         help="dont clean up temperorary files created for deepaccnet")
-    err_params.add_argument('-v','--verbose', action="store_true", default=False,
+    options.add_argument('-v','--verbose', action="store_true", default=False,
         help="print extra updates")
-    err_params.add_argument('-j', '--processors', type=int, required=False, default=1,
-        help='number processors to use if running locally')
+#    options.add_argument('-j', '--processors', type=int, required=False, default=1,
+#        help='number processors to use if running locally')
     job_params.add_argument('--scheduler', action="store_true", default=False,
         help='submit to cluster, uses slurm scheduler through dask')
     job_params.add_argument('--queue', type=str, default="", required=False,
@@ -141,37 +131,50 @@ def parseargs():
 def commandline_main():
     args = parseargs()
 
-    # set up and run
-    MEM = 0
     if args.clean:
         args.pdb = clean_pdb(args.pdb)
+
+    if not args.skip_relax:
+        refined_pdb = f"{args.pdb[:-4]}_refined.pdb"
+        if args.verbose: print("running local relax")
+        refine.run(args.pdb, args.map, args.reso, refined_pdb)
+        args.pdb = refined_pdb
+
+    MEM = 0
     if args.scheduler:
         MEM = 40
         if not args.queue:
             raise RuntimeError('set queue to run with scheduler')
         if not args.workers:
             raise RuntimeError('specify number of workers to use with dask')
-        errors = run_error_detection(args.pdb, args.map, args.reso, run_relax=args.relax,
+        errors = run_error_detection(args.pdb, args.map, args.reso,
                         mem=MEM, queue=args.queue, workers=args.workers, verbose=args.verbose)
     else:
-        errors = run_error_detection(args.pdb, args.map, args.reso, 
-                        run_relax=args.relax, verbose=args.verbose)
+        errors = run_error_detection(args.pdb, args.map, args.reso, verbose=args.verbose)
     
+    prob_coln = "error_probability" # this is defined in two places ugly
+
     # analysis
-    prob_coln = "error probability" # this is defined in two places ugly
     high_error_threshold = 0.78
     low_error_threshold = 0.60
     if args.verbose: print('calculating score contributions')
-    error_dict_summary = analyze.collect_error_info(errors, prob_coln, low_error_threshold)
+    error_dict_summary = analyze.collect_error_info(errors, prob_coln, low_error_threshold, 
+                            contributing_csvf=f"{os.path.basename(args.pdb)[:-4]}_MEDIC_predictions.csv")
     error_summary = analyze.get_error_report_str(error_dict_summary, 
                         high_error_threshold, 
                         low_error_threshold)
+    
+    # output files
+    set_pred_as_bfac(args.pdb, errors, prob_coln)
     with open("MEDIC_summary.txt", 'w') as f:
         f.write(error_summary)
+
+    # print analysis
     print('\n\n')
-    print('------------------------- ERROR SUMMARY -------------------------')
+    print('------------------------- ERROR SUMMARY -------------------------\n')
     print(error_summary)
-    print('-----------------------------------------------------------------')
+    print('\n-----------------------------------------------------------------')
+    
     if not args.keep_intermediates:
         clean_dan_files(args.pdb)
 

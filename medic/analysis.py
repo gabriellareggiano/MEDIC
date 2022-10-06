@@ -20,7 +20,7 @@ def calc_prob(zdens1, zdens3, lddt, rama, cart):
     return 1/(1+exp(-1*fx))
 
                                      
-def calculate_contributions(scores, thres):
+def calculate_contributions(scores, prob_coln, thres):
     # these are taken from the means for over 1000 structures in EMDB
     # TODO - will i need to recalculate these for the newest version?
     lddt_mean = 0.7685407746442903
@@ -28,6 +28,8 @@ def calculate_contributions(scores, thres):
     zdens3_mean = -0.6072111874018266
     rama_mean = 0.19317735155421467
     cart_mean = 0.8337395547340672
+
+    # calculate probabilities only with scores of interest
     scores['only_lddt_probability'] = scores.apply(lambda row: calc_prob(zdens1_mean, zdens3_mean,
                                                                         row['lddt'], rama_mean, cart_mean), axis=1)
     scores['only_dens_probability'] = scores.apply(lambda row: calc_prob(row['perResZDensWin1'], row['perResZDensWin3'],
@@ -42,26 +44,35 @@ def calculate_contributions(scores, thres):
                                                                         row['rama_prepro'], row['cart_bonded']), axis=1)
 
     scores['contributing_factors'] = "none"
+
+    # single score contributing
+    # no previous score was over threshold and our single prediction is 
     scores.loc[(scores['only_lddt_probability'] >= thres)
                 & (scores['contributing_factors'].str.match("none")), 'contributing_factors'] = 'lddt'
     scores.loc[(scores['only_dens_probability'] >= thres)
                 & (scores['contributing_factors'].str.match("none")), 'contributing_factors'] = 'density'
     scores.loc[(scores['only_geo_probability'] >= thres)
                 & (scores['contributing_factors'].str.match("none")), 'contributing_factors'] = 'geometry'
+    
+    # two scores contributing
+    # no previous score was over and these two together is over and the greatest of the three combos
     scores.loc[(scores['lddt_dens_probability'] >= thres) 
-                    & (scores['only_lddt_probability'] < thres) 
-                    & (scores['only_dens_probability'] < thres)
+                    & (scores['lddt_dens_probability'] > scores['lddt_geo_probability']) 
+                    & (scores['lddt_dens_probability'] > scores['dens_geo_probability'])
                     & (scores['contributing_factors'].str.match("none")), 'contributing_factors'] = 'lddt + density'
     scores.loc[(scores['lddt_geo_probability'] >= thres) 
-                    & (scores['only_lddt_probability'] < thres) 
-                    & (scores['only_geo_probability'] < thres)
+                    & (scores['lddt_geo_probability'] > scores['lddt_dens_probability']) 
+                    & (scores['lddt_geo_probability'] > scores['dens_geo_probability'])
                     & (scores['contributing_factors'].str.match("none")), 'contributing_factors'] = 'lddt + geometry'
     scores.loc[(scores['dens_geo_probability'] >= thres) 
-                    & (scores['only_dens_probability'] < thres)  
-                    & (scores['only_geo_probability'] < thres)
+                    & (scores['dens_geo_probability'] > scores['lddt_dens_probability'])  
+                    & (scores['dens_geo_probability'] > scores['lddt_geo_probability'])
                     & (scores['contributing_factors'].str.match("none")), 'contributing_factors'] = 'density + geometry'
-    scores.loc[scores['contributing_factors'].str.match("none"), 'contributing_factors'] = 'lddt + density + geometry'
-    scores.to_csv("test_analysis.csv")
+
+    # if no marker at this point, then they all contribute
+    scores.loc[(scores['contributing_factors'].str.match("none"))
+                    & (scores[prob_coln] >= thres), 'contributing_factors'] = 'lddt + density + geometry'
+    
     scores.drop(inplace=True, axis=1,
                     columns=['only_lddt_probability',
                             'only_dens_probability',
@@ -76,16 +87,17 @@ def get_group_contributors(df):
     vals = list(df['contributing_factors'].unique())
     final = set()
     for v in vals:
-        subs = [ x.strip() for x in v.split('+') if x.strip() not in final]
-        for s in subs:
+        for s in [ x.strip() for x in v.split('+') ]:
             final.add(s)
     final = sorted(list(final))
     return ' + '.join(final)
 
 
-def collect_error_info(scores, prob_coln, thres):
-    scores_breakdown = calculate_contributions(scores, thres)
-    # group by error segment and chain ID (chain id will break up mistakes across chains)
+def collect_error_info(scores, prob_coln, thres, contributing_csvf=""):
+    scores_breakdown = calculate_contributions(scores, prob_coln, thres)
+    if contributing_csvf: scores_breakdown.to_csv(contributing_csvf)
+
+    # group by error segment and chain ID (chain id will break up segments across chains)
     scores_breakdown['error'] = scores_breakdown[prob_coln] >= thres
     scores_breakdown['streak_id'] = (scores_breakdown['error'] != scores_breakdown['error'].shift(1)).cumsum()
     errors = scores_breakdown.loc[(scores_breakdown['error'] == True)]

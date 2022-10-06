@@ -222,12 +222,14 @@ def calc_lddts_hpc(pdbf, win_len,neighborhood,
             "ros_resi": list() }
     total_residues = get_number_of_residues(full_pose)
     resi = 1
+    seen_residues = dict()
     for ch in full_pose.chains:
         for grp in ch.groups:
             pinf["resn"].append(grp.groupName)
             pinf["resi"].append(grp.groupNumber)
             pinf["chID"].append(ch.ID)
             pinf["ros_resi"].append(resi)
+            seen_residues[resi] = 0
             resi += 1
     full_results = pd.DataFrame.from_dict(pinf)
     full_results['lddt'] = np.nan
@@ -249,7 +251,7 @@ def calc_lddts_hpc(pdbf, win_len,neighborhood,
                 if end >= total_residues:
                     end = total_residues+1
                 init_residues = list(range(resi,end))
-                main_residues = same_chain_and_stragglers(init_residues, pinf, win_len)
+                main_residues = same_chain_and_stragglers(init_residues, pinf, win_len, seen_residues)
                 extracted_pose, new_resis = extract_region(full_pose,
                                     main_residues, pinf,
                                     neighborhood)
