@@ -11,6 +11,7 @@ from math import ceil
 from copy import deepcopy
 import torch
 import sys
+import multiprocessing
 
 from medic.pdb_io import read_pdb_file, write_pdb_file
 from medic.util import get_number_of_residues
@@ -155,7 +156,7 @@ def run_dan(infilepath):
     return lddt_cpu
 
 
-def calc_lddts(pdbf, win_len, neighborhood, verbose=False):
+def calc_lddts(pdbf, win_len, neighborhood, verbose=False, processes=1):
     pyrosetta.init("-ex1 -ex2aro -constant_seed -read_only_ATOM_entries")
     pyrosetta.rosetta.basic.options.set_boolean_option("in:missing_density_to_jump", False)
     pyrosetta.rosetta.basic.options.set_boolean_option("cryst:crystal_refine", False)
@@ -180,9 +181,12 @@ def calc_lddts(pdbf, win_len, neighborhood, verbose=False):
     full_results = pd.DataFrame.from_dict(pinf)
     full_results['lddt'] = np.nan
 
-    if verbose: print(f'running tasks for DeepAccNet on processes')
+    if verbose: print(f'running tasks for DeepAccNet on {processes} processes')
+
+    # setup for dan
     indices_to_keep = list()
     extracted_lddts = list()
+    inputs = list()
     for resi in range(1, total_residues, win_len):
         end = resi+win_len
         if end >= total_residues:
@@ -196,7 +200,15 @@ def calc_lddts(pdbf, win_len, neighborhood, verbose=False):
                             new_resis.index(main_residues[-1])))
         ext_pdbf = f"{os.path.basename(pdbf)[:-4]}_r{resi:04d}.pdb" 
         write_pdb_file(extracted_pose, ext_pdbf)
-        extracted_lddts.append(run_dan(ext_pdbf))
+        inputs.append(ext_pdbf)
+    
+    # run dans
+    if processes > 1:
+        with multiprocessing.Pool(processes) as pool:
+            extracted_lddts = pool.map(run_dan, inputs)
+    else:
+        for p in inputs:
+            extracted_lddts.append(run_dan(p))
     
     main_lddts = list()
     for i,lddts in enumerate(extracted_lddts):

@@ -20,7 +20,7 @@ import medic.analysis as analyze
 from medic.util import extract_energy_table, clean_dan_files, clean_pdb
 from medic.pdb_io import read_pdb_file, write_pdb_file
 
-def compile_data(pdbf, mapf, reso, verbose=False,
+def compile_data(pdbf, mapf, reso, verbose=False, processes=1,
         mem=0, queue="", workers=0):
     if verbose: print('calculating zscores')
     data = dens_zscores.run(pdbf, mapf, reso)
@@ -35,7 +35,7 @@ def compile_data(pdbf, mapf, reso, verbose=False,
                                 verbose=verbose)
     else: # run locally
         deepAccNet_scores = broken_DAN.calc_lddts(pdbf, WINDOW_LENGTH, 
-                                NEIGHBORHOOD, verbose=verbose)
+                                NEIGHBORHOOD, verbose=verbose, processes=processes)
     # NOTE - this naming convention comes from broken_DAN script
     data["lddt"] = deepAccNet_scores["lddt"]
 
@@ -68,11 +68,10 @@ def get_probabilities(df, model, prob_coln):
     return df
 
 
-def set_pred_as_bfac(pdbf, predictions, prob_coln):
+def set_pred_as_bfac(pdbf, predictions, prob_coln, new_pdbf):
     pose = read_pdb_file(pdbf)
     predictions['resID'] = predictions["resi"].astype(str)+"."+predictions["chID"]
     predictions = predictions.set_index("resID")
-    new_pdbf = f"{os.path.basename(pdbf)[:4]}_MEDIC_bfac_pred.pdb"
     for ch in pose.chains:
         for grp in ch.groups:
             for atm in grp.atoms:
@@ -85,10 +84,10 @@ def set_pred_as_bfac(pdbf, predictions, prob_coln):
     write_pdb_file(pose, new_pdbf)
 
 
-def run_error_detection(pdbf, mapf, reso, verbose=False,
+def run_error_detection(pdbf, mapf, reso, verbose=False, processes=1,
                 mem=0, queue="", workers=0):
     if verbose: print("collecting scores")
-    dat = compile_data(pdbf, mapf, reso, verbose=verbose,
+    dat = compile_data(pdbf, mapf, reso, verbose=verbose, processes=1,
                     mem=mem, queue=queue, workers=workers)
 
     if verbose: print('loading statistical model')
@@ -117,8 +116,8 @@ def parseargs():
         help="dont clean up temperorary files created for deepaccnet")
     options.add_argument('-v','--verbose', action="store_true", default=False,
         help="print extra updates")
-#    options.add_argument('-j', '--processors', type=int, required=False, default=1,
-#        help='number processors to use if running locally')
+    options.add_argument('-j', '--processors', type=int, required=False, default=2,
+        help='number processors to use if running locally')
     job_params.add_argument('--scheduler', action="store_true", default=False,
         help='submit to cluster, uses slurm scheduler through dask')
     job_params.add_argument('--queue', type=str, default="", required=False,
@@ -150,7 +149,7 @@ def commandline_main():
         errors = run_error_detection(args.pdb, args.map, args.reso,
                         mem=MEM, queue=args.queue, workers=args.workers, verbose=args.verbose)
     else:
-        errors = run_error_detection(args.pdb, args.map, args.reso, verbose=args.verbose)
+        errors = run_error_detection(args.pdb, args.map, args.reso, processes=args.processors, verbose=args.verbose)
     
     prob_coln = "error_probability" # this is defined in two places ugly
 
@@ -165,7 +164,8 @@ def commandline_main():
                         low_error_threshold)
     
     # output files
-    set_pred_as_bfac(args.pdb, errors, prob_coln)
+    set_pred_as_bfac(args.pdb, errors, prob_coln, 
+                    f"{os.path.basename(args.pdb)[:-4]}_MEDIC_bfac_pred.pdb")
     with open("MEDIC_summary.txt", 'w') as f:
         f.write(error_summary)
 
