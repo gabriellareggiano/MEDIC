@@ -48,11 +48,14 @@ def calculate_contributions(scores, prob_coln, thres):
     # single score contributing
     # no previous score was over threshold and our single prediction is 
     scores.loc[(scores['only_lddt_probability'] >= thres)
-                & (scores['contributing_factors'].str.match("none")), 'contributing_factors'] = 'lddt'
+                & (scores['only_dens_probability'] < thres)
+                & (scores['only_geo_probability'] < thres), 'contributing_factors'] = 'lddt'
     scores.loc[(scores['only_dens_probability'] >= thres)
-                & (scores['contributing_factors'].str.match("none")), 'contributing_factors'] = 'density'
+                & (scores['only_lddt_probability'] < thres)
+                & (scores['only_geo_probability'] < thres), 'contributing_factors'] = 'density'
     scores.loc[(scores['only_geo_probability'] >= thres)
-                & (scores['contributing_factors'].str.match("none")), 'contributing_factors'] = 'geometry'
+                & (scores['only_dens_probability'] < thres)
+                & (scores['only_lddt_probability'] < thres), 'contributing_factors'] = 'geometry'
     
     # two scores contributing
     # no previous score was over and these two together is over and the greatest of the three combos
