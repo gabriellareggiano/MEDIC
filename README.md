@@ -73,8 +73,8 @@ If your structure has ligands or nucleac acids or noncanonical amino acids, add 
    - Attributes of -> residues
    - Attribute -> average -> bfactor
    - Choose your thresholds for coloring we recommend:
-   - 0.78 -> far right histogram
-   - 0.60 -> left
+     - 0.78 -> far right histogram
+     - 0.60 -> left
    - Note that setting this value to lower than 0.60 may allow you to find more errors, but MEDIC will also mark more false positives.
 
 
