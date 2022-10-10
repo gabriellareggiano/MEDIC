@@ -33,7 +33,7 @@ You can run the following to see all options for MEDIC
 ./path/to/MEDIC/detect_errors.py --help
 ```
 
-Make sure your pdb is docked into the map before running
+The minimal command is shown below. Make sure your pdb is docked into the map before running.
 ```
 ./path/to/MEDIC/detect_errors.py –pdb {path/to/pdb} –map {path/to/map} –reso {global resolution} –j {number_processes}
 ```
