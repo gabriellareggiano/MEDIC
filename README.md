@@ -9,13 +9,36 @@ Robust residue-level error detection in cryo-electron microscopy models. Gabriel
 ## Installation/dependencies
 
 To install MEDIC, git clone the source code and install the following with anaconda
+
 NEED INSTRUCTIONS FOR PYROSETTA INSTALL
+
+- Apply  for a license (free for academic use) on this URL_TODO
+- Add the PyRosetta channel to your *~/.condarc* adn replace the username and password with your information
 ```
-CODE HERE
-CONDA STUFF
-THEN GIT CLONE
-THEN PIP INSTALL
+        channels:
+            - https://username:password@conda.graylab.jhu.edu
+            - defaults
 ```
+
+- Create a conda environment for MEDIC (here called *medic*):
+
+```
+        conda create -n medic -y python=3 pytorch pyrosetta
+        conda install -n medic -y tensorflow keras requests more-itertools matplotlib click=7.1.2 dask=2.30 dask-jobqueue
+        conda activate medic
+        pip install mmtf-python sklearn
+```
+
+- Install MEDIC into the active conda environment
+```
+        conda activate medic
+        git clone --recursive https://github.com/gabriellareggiano/private_MEDIC.git
+        cd private_MEDIC
+        git submodule set-url DeepAccNet https://github.com/gabriellareggiano/DeepAccNet.git
+        git submodule update --init
+        python setup.py install
+```
+
 
 ## Running MEDIC on your structure
 ### MEDIC background
