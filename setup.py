@@ -9,5 +9,6 @@ setup(name="medic",
 	long_description=open('README.md').read(),
 	author="Gabriella Reggiano",
 	packages=find_packages(exclude=["medic_model"]),
+	scripts=['detect_errors.py'],
 	include_package_data=True
 )
