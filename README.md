@@ -25,7 +25,7 @@ NEED INSTRUCTIONS FOR PYROSETTA INSTALL
 ```
     conda create -n medic -y python=3 pytorch pyrosetta
     conda install -n medic -y tensorflow keras requests more-itertools matplotlib
-    conda install click=7.1.2 dask=2.30 dask-jobqueue
+    conda install -n medic -y click=7.1.2 dask=2.30 dask-jobqueue
     conda activate medic
     pip install mmtf-python sklearn
 ```
