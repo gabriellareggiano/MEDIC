@@ -10,5 +10,8 @@ setup(name="medic",
 	author="Gabriella Reggiano",
 	packages=find_packages(exclude=["medic_model"]),
 	scripts=['detect_errors.py'],
-	include_package_data=True
+	include_package_data=True,
+	package_data={
+		'DeepAccNet': ['deepAccNet/data/*.txt', 'deepAccNet/data/*.csv'],
+	}
 )
