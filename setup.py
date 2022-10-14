@@ -12,6 +12,6 @@ setup(name="medic",
 	scripts=['detect_errors.py'],
 	include_package_data=True,
 	package_data={
-		'DeepAccNet': ['deepAccNet/data/*.txt', 'deepAccNet/data/*.csv'],
+		'DeepAccNet': ['deepAccNet/data/*.txt', 'deepAccNet/data/*.csv', 'models/NatComm_standard/*.pkl'],
 	}
 )
