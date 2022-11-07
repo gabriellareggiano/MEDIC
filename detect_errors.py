@@ -108,14 +108,14 @@ def parseargs():
     inp_params.add_argument('--pdb', type=str, required=True)
     inp_params.add_argument('--map', type=str, required=True)
     inp_params.add_argument('--reso', type=float, required=True)
+    inp_params.add_argument('--testmap', type=str, required=False, default="",
+        help="use halfmaps for analysis. provide 1st halfmap with --map and 2nd with --testmap")
     options.add_argument('--clean', action="store_true", default=False,
         help="clean the pdb before running (remove HETATMS/noncanonicals)")
     options.add_argument('--skip_relax', action="store_true", default=False, 
         help="skip the relax step, only do this if your pdb is from Rosetta")
     options.add_argument('--keep_intermediates', action="store_true", default=False,
         help="dont clean up temperorary files created for deepaccnet")
-    options.add_argument('--testmap', type=str, required=False, default="",
-        help="use halfmaps for analysis. provide 1st halfmap with --map and 2nd with --testmap")
     options.add_argument('-v','--verbose', action="store_true", default=False,
         help="print extra updates")
     options.add_argument('-j', '--processors', type=int, required=False, default=2,
@@ -139,7 +139,7 @@ def commandline_main():
         args.testmap = args.map
 
     if not args.skip_relax:
-        refined_pdb = f"{args.pdb[:-4]}_refined.pdb"
+        refined_pdb = f"{os.path.basename(args.pdb)[:-4]}_refined.pdb"
         if args.verbose: print("running local relax")
         refine.run(args.pdb, args.map, args.reso, refined_pdb)
         args.pdb = refined_pdb

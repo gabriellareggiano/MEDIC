@@ -3,14 +3,16 @@
 """
 import pyrosetta
 import argparse
+import os
 
 def run(pdbf: str, mapf: str,
-        reso: float, out_pdb: str) -> None:
+        reso: float, out_pdb: str,
+        bf_tether: float = 5E-4) -> None:
     """ setup refinement into density map
         refinement is three steps: cart min, local relax, bfactor fitting
         input pose will be refined
     """
-    flags = ['-mute all',
+    flags = [#'-mute all',
             '-ignore_unrecognized_res',
             '-default_max_cycles 200',
             f'-edensity::mapfile {mapf}',
@@ -50,8 +52,8 @@ def run(pdbf: str, mapf: str,
     local_relax_mover.set_sfxn(sf)
 
     bfacfit_mover = pyrosetta.rosetta.protocols.electron_density.BfactorFittingMover()
-    bfacfit_mover.set_max_iter(50)
-    bfacfit_mover.set_wt_adp(5E-4)
+    bfacfit_mover.set_max_iter(100)
+    bfacfit_mover.set_wt_adp(bf_tether)
     bfacfit_mover.set_init(1)
     bfacfit_mover.set_exact(1)
 
@@ -71,9 +73,10 @@ def commandline_main():
     parser.add_argument('--pdb', type=str, required=True)
     parser.add_argument('--map', type=str, required=True)
     parser.add_argument('--reso', type=float, required=True)
+    parser.add_argument('--tether', type=float, required=False)
     args = parser.parse_args()
 
-    out_pdb = f"{args.pdb[:-4]}_0001.pdb"
+    out_pdb = f"{os.path.basename(args.pdb)[:-4]}_0001.pdb"
     run(args.pdb, args.map, args.reso, out_pdb)
 
 
