@@ -12,7 +12,7 @@ To install MEDIC, git clone the source code and install the following with anaco
 
 NEED INSTRUCTIONS FOR PYROSETTA INSTALL
 
-- Apply  for a license (free for academic use) on this URL_TODO
+- Apply  for a license (free for academic use) [here] (https://els2.comotion.uw.edu/product/rosetta)
 - Add the PyRosetta channel to your *~/.condarc* and replace the *username* and *password* with your information
 ```
     channels:
