@@ -1,3 +1,4 @@
+build/*
 __pycache/
 *.py[cod]
 *$py.class
