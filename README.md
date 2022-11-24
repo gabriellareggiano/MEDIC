@@ -11,7 +11,8 @@ Robust residue-level error detection in cryo-electron microscopy models. Gabriel
 Before installing MEDIC, install anaconda and pip on your system.
 Then, install the following with anaconda and git clone the source code.
 
-In depth instructions for the installation of pyrosetta can be found [here](https://www.pyrosetta.org/downloads#h.6vttn15ac69d)
+#### Install PyRosetta
+In depth instructions for the installation of pyrosetta can be found [here](https://www.pyrosetta.org/downloads#h.6vttn15ac69d).
 Or you can follow the instructions below.
 
 - Apply  for a license (free for academic use) [here](https://els2.comotion.uw.edu/product/rosetta)
@@ -22,7 +23,7 @@ Or you can follow the instructions below.
         - defaults
 ```
 
-- Create a conda environment for MEDIC (here called *medic*):
+#### Create a conda environment for MEDIC (here called *medic*):
 
 ```
     conda create -n medic -y python=3 pytorch pyrosetta
@@ -32,7 +33,7 @@ Or you can follow the instructions below.
     pip install mmtf-python sklearn
 ```
 
-- Install MEDIC into the active conda environment
+#### Install MEDIC into the active conda environment
 ```
     conda activate medic
     git clone --recursive https://github.com/gabriellareggiano/private_MEDIC.git
