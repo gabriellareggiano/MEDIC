@@ -12,7 +12,7 @@ Before installing MEDIC, install anaconda and pip on your system.
 Then, install the following with anaconda and git clone the source code.
 
 #### Install PyRosetta
-In depth instructions for the installation of pyrosetta can be found [here](https://www.pyrosetta.org/downloads#h.6vttn15ac69d).
+In depth instructions for the installation of pyrosetta can be found here: [Installation with environment manager](https://www.pyrosetta.org/downloads#h.6vttn15ac69d).
 Or you can follow the instructions below.
 
 - Apply  for a license (free for academic use) [here](https://els2.comotion.uw.edu/product/rosetta)
