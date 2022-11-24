@@ -8,9 +8,11 @@ Robust residue-level error detection in cryo-electron microscopy models. Gabriel
 
 ## Installation/dependencies
 
-To install MEDIC, git clone the source code and install the following with anaconda
+Before installing MEDIC, install anaconda and pip on your system.
+Then, install the following with anaconda and git clone the source code.
 
-NEED INSTRUCTIONS FOR PYROSETTA INSTALL
+In depth instructions for the installation of pyrosetta can be found [here](https://www.pyrosetta.org/downloads#h.6vttn15ac69d)
+Or you can follow the instructions below.
 
 - Apply  for a license (free for academic use) [here](https://els2.comotion.uw.edu/product/rosetta)
 - Add the PyRosetta channel to your *~/.condarc* and replace the *username* and *password* with your information
