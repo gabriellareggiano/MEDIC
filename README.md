@@ -9,13 +9,37 @@ Robust residue-level error detection in cryo-electron microscopy models. Gabriel
 ## Installation/dependencies
 
 To install MEDIC, git clone the source code and install the following with anaconda
+
 NEED INSTRUCTIONS FOR PYROSETTA INSTALL
+
+- Apply  for a license (free for academic use) [here](https://els2.comotion.uw.edu/product/rosetta)
+- Add the PyRosetta channel to your *~/.condarc* and replace the *username* and *password* with your information
 ```
-CODE HERE
-CONDA STUFF
-THEN GIT CLONE
-THEN PIP INSTALL
+    channels:
+        - https://username:password@conda.graylab.jhu.edu
+        - defaults
 ```
+
+- Create a conda environment for MEDIC (here called *medic*):
+
+```
+    conda create -n medic -y python=3 pytorch pyrosetta
+    conda install -n medic -y tensorflow keras requests more-itertools matplotlib
+    conda install -n medic -y click=7.1.2 dask=2.30 dask-jobqueue
+    conda activate medic
+    pip install mmtf-python sklearn
+```
+
+- Install MEDIC into the active conda environment
+```
+    conda activate medic
+    git clone --recursive https://github.com/gabriellareggiano/private_MEDIC.git
+    cd private_MEDIC
+    git submodule set-url DeepAccNet https://github.com/gabriellareggiano/DeepAccNet.git
+    git submodule update --init
+    python setup.py install
+```
+
 
 ## Running MEDIC on your structure
 ### MEDIC background
@@ -33,7 +57,7 @@ You can run the following to see all options for MEDIC
 ./path/to/MEDIC/detect_errors.py --help
 ```
 
-Make sure your pdb is docked into the map before running
+The minimal command is shown below. Make sure your pdb is docked into the map before running.
 ```
 ./path/to/MEDIC/detect_errors.py –pdb {path/to/pdb} –map {path/to/map} –reso {global resolution} –j {number_processes}
 ```
