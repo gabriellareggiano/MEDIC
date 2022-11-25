@@ -15,7 +15,7 @@ if os.path.isfile(requirements_path):
 		install_requires = f.read().splitlines()
 print(install_requires)
 setup(name="medic",
-	version='0.1dev',
+	version='1.0',
 	description="Model Error Detection in Cryo-EM",
 	long_description=long_description,
 	author="Gabriella Reggiano",
