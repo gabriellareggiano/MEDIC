@@ -19,11 +19,11 @@ setup(name="medic",
 	description="Model Error Detection in Cryo-EM",
 	long_description=long_description,
 	author="Gabriella Reggiano",
-	packages=find_packages(exclude=["medic_model"]),
+	packages=find_packages(include=['medic','DeepAccNet/deepAccNet'],exclude=["medic_model"]),
 	scripts=['detect_errors.py'],
 	include_package_data=True,
 	package_data={
 		'DeepAccNet': ['deepAccNet/data/*.txt', 'deepAccNet/data/*.csv', 'models/NatComm_standard/*.pkl'],
-	}
+	},
 	install_requires=install_requires
 )

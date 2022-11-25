@@ -39,7 +39,7 @@ Or you can follow the instructions below.
     cd private_MEDIC
     git submodule set-url DeepAccNet https://github.com/gabriellareggiano/DeepAccNet.git
     git submodule update --init
-    pip install .
+    pip install -e .
 ```
 
 
