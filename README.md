@@ -35,7 +35,7 @@ Or you can follow the instructions below.
 #### Install MEDIC into the active conda environment
 ```
     conda activate medic
-    git clone --recursive https://github.com/gabriellareggiano/private_MEDIC.git
+    git clone --recursive https://github.com/gabriellareggiano/MEDIC.git
     cd private_MEDIC
     git submodule set-url DeepAccNet https://github.com/gabriellareggiano/DeepAccNet.git
     git submodule update --init
