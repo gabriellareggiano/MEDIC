@@ -36,7 +36,7 @@ Or you can follow the instructions below.
 ```
     conda activate medic
     git clone --recursive https://github.com/gabriellareggiano/MEDIC.git
-    cd private_MEDIC
+    cd MEDIC
     git submodule set-url DeepAccNet https://github.com/gabriellareggiano/DeepAccNet.git
     git submodule update --init
     pip install -e .
