@@ -29,7 +29,7 @@ Or you can follow the instructions below.
 #### Create a conda environment for MEDIC (here called *medic*):
 
 ```
-    conda create -n medic -y python=3.7 pyrosetta
+    conda create -n medic -y python=3.9 pyrosetta
 ```
 
 #### Install MEDIC into the active conda environment
@@ -37,8 +37,6 @@ Or you can follow the instructions below.
     conda activate medic
     git clone --recursive https://github.com/gabriellareggiano/MEDIC.git
     cd MEDIC
-    git submodule set-url DeepAccNet https://github.com/gabriellareggiano/DeepAccNet.git
-    git submodule update --init
     pip install -e .
 ```
 
