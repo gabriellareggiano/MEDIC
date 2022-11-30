@@ -50,36 +50,45 @@ MEDIC has four steps, all performed with this script:
 3. Calculation of predicted lDDTs [^2]
 4. Error prediction
 
-### MEDIC command
+### Running MEDIC
 
 You can run the following to see all options for MEDIC
 ```
 ./path/to/MEDIC/detect_errors.py --help
 ```
-
+\
+MEDIC should be installed as an executable script in your bin. If you run:
+```
+which detect_errors.py
+```
+and get a path to a file, then you can run MEDIC with only:
+```
+./detect_errors.py --help
+```
+\
 The minimal command is shown below. Make sure your pdb is docked into the map before running.
 ```
 ./path/to/MEDIC/detect_errors.py –pdb {path/to/pdb} –map {path/to/map} –reso {global resolution} –j {number_processes}
 ```
-If your structure has already been relaxed with Rosetta, add the flag: —skip_relax
+If your structure has already been relaxed with Rosetta, add the flag: `--skip_relax`
   - The relax is mandatory, don’t skip if your pdb hasn’t been through Rosetta
 
-If your structure has ligands or nucleac acids or noncanonical amino acids, add the flag:  –clean 
+If your structure has ligands or nucleac acids or noncanonical amino acids, add the flag: `--clean` 
 
-## Visualizing/inspecting outputs
+## Visualizing and inspecting outputs
 
 ### MEDIC outputs the following files:
 
-- {pdb}_refined.pdb
+- `{pdb}_refined.pdb`
   - this is your structure after the local relax
 
-- {pdb}_MEDIC_bfac_pred.pdb
+- `{pdb}_MEDIC_bfac_pred.pdb`
   - this is your relaxed structure with the probabilities in the B-factor column
 
-- {pdb}_MEDIC_predictions.csv
+- `{pdb}_MEDIC_predictions.csv`
   - this contains all the relevant scores for every residue with the predicted probabilities
 
-- MEDIC_summary.txt
+- `MEDIC_summary.txt`
   - this contains all the segments that have been marked as errors, as well as the scores that flagged them as errors
 ```
               25R - 28R, definite error       —> high probability error, residues 25-28, chain R
@@ -91,7 +100,7 @@ If your structure has ligands or nucleac acids or noncanonical amino acids, add 
 
 ### To view your error predictions in Chimera:
 
-1. Load in your *bfac_pred.pdb to Chimera. 
+1. Load in your `*bfac_pred.pdb` to Chimera. 
 2. Go to Tools -> Depiction -> Render by attribute
 3. In the Render by attribute window:
    - Attributes of -> residues
@@ -104,14 +113,14 @@ If your structure has ligands or nucleac acids or noncanonical amino acids, add 
 
 ### To view your error predictions in ChimeraX:
 
-1. Load in your *bfac_pred.pdb to Chimera
+1. Load in your `*bfac_pred.pdb` to Chimera
 2. Enter the following commands (feel free to use your own colors):
-   - select @@bfactor >= 0.78
-   - color sel medium violet red
-   - select @@bfactor>=0.6 & @@bfactor < 0.78
-   - color sel pale violet red
-   - select @@bfactor < 0.6
-   - color sel steel blue
+   - `select @@bfactor >= 0.78`
+   - `color sel medium violet red`
+   - `select @@bfactor>=0.6 & @@bfactor < 0.78`
+   - `color sel pale violet red`
+   - `select @@bfactor < 0.6`
+   - `color sel steel blue`
 
 
 [^1]: Local relax reference (https://elifesciences.org/articles/17219)
