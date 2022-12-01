@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """ a script that will use our model to predict errors for a map/pdb
     it will:
         run a local relax (optional)
@@ -12,11 +13,11 @@ import os
 import importlib.resources as pkg_resources
 from math import floor
 
-import medic.medic_model
-import medic.broken_DAN as broken_DAN
-import medic.density_zscores as dens_zscores
-import medic.refine as refine
-import medic.analysis as analyze
+from medic import medic_model
+from medic import broken_DAN as broken_DAN
+from medic import density_zscores as dens_zscores
+from medic import refine
+from medic import analysis as analyze
 from medic.util import extract_energy_table, clean_dan_files, clean_pdb
 from medic.pdb_io import read_pdb_file, write_pdb_file
 
@@ -49,7 +50,7 @@ def compile_data(pdbf, mapf, reso, verbose=False, processes=1,
 
 def get_feature_order():
     feats = list()
-    params_str = pkg_resources.read_text(medic.medic_model, "model_params.txt")
+    params_str = pkg_resources.read_text(medic_model, "model_params.txt")
     lines = [ x.strip() for x in params_str.split('\n') if x ]
     start = False
     for line in lines:
@@ -91,7 +92,7 @@ def run_error_detection(pdbf, mapf, reso, verbose=False, processes=1,
                     mem=mem, queue=queue, workers=workers)
 
     if verbose: print('loading statistical model')
-    loaded_model = pickle.load(pkg_resources.open_binary(medic.medic_model, 'model.sav'))
+    loaded_model = pickle.load(pkg_resources.open_binary(medic_model, 'model.sav'))
 
     if verbose: print('predicting errors')
     prob_coln = "error_probability"
