@@ -127,23 +127,26 @@ def extract_energy_table(pdbf):
 def clean_dan_files(input_file_name):
     tmp_files = glob.glob(f"{input_file_name[:-4]}*_r[0-9][0-9][0-9][0-9].???")
     for f in tmp_files:
-        try:
-            if os.path.isfile(f):
-                os.remove(f)
-        except:
-            print("Failed to clean for", f)
+        rm_file(f)
 
 
-def clean_pdb(pdbf):
+def rm_file(input_file_name):
+    try:
+        if os.path.isfile(input_file_name):
+            os.remove(input_file_name)
+    except:
+        print("Failed to clean for", input_file_name)
+
+
+def clean_pdb(pdbf, out_pdb):
     compatible_res = ["ALA", "ARG", "ASN", "ASP", "CYS", "GLU",
              "GLN", "GLY", "HIS", "ILE", "LEU", "LYS",
              "MET", "PHE", "PRO", "SER", "THR", "TRP",
              "TYR", "VAL"]
     with open(pdbf, 'r') as f:
-        pdb_lines = [line.strip() for line in f.readlines()
+        lines = f.readlines()
+    pdb_lines = [line.strip() for line in lines
                     if line[:4] == "ATOM" and line[17:21].strip() in compatible_res]
-    new_pdb = pdbf[:-4]+"_clean.pdb"
-    with open(new_pdb, 'w') as f:
+    with open(out_pdb, 'w') as f:
         f.write('\n'.join(pdb_lines))
-    return new_pdb
     

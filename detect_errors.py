@@ -18,7 +18,7 @@ from medic import broken_DAN as broken_DAN
 from medic import density_zscores as dens_zscores
 from medic import refine
 from medic import analysis as analyze
-from medic.util import extract_energy_table, clean_dan_files, clean_pdb
+from medic.util import extract_energy_table, clean_dan_files, clean_pdb, rm_file
 from medic.pdb_io import read_pdb_file, write_pdb_file
 
 def compile_data(pdbf, mapf, reso, verbose=False, processes=1,
@@ -132,9 +132,16 @@ def commandline_main():
     args = parseargs()
 
     if args.clean:
-        args.pdb = clean_pdb(args.pdb)
+        cleaned_pdb = f"{args.pdb[:-4]}_clean.pdb"
+        clean_pdb(args.pdb, cleaned_pdb)
+        args.pdb = cleaned_pdb
 
-    if not args.skip_relax:
+    if args.skip_relax:
+        # make sure we have an energy table to pull scores from
+        scored_pdb = f"{args.pdb[:-4]}_scored.pdb"
+        refine.score_and_dump(args.pdb, args.map, args.reso, scored_pdb)
+        args.pdb = scored_pdb
+    else:
         refined_pdb = f"{args.pdb[:-4]}_refined.pdb"
         if args.verbose: print("running local relax")
         refine.run(args.pdb, args.map, args.reso, refined_pdb)
@@ -178,6 +185,8 @@ def commandline_main():
     
     if not args.keep_intermediates:
         clean_dan_files(args.pdb)
+        rm_file(scored_pdb)
+        rm_file(cleaned_pdb)
 
     
 if __name__ == "__main__":
