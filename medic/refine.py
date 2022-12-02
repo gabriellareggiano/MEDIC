@@ -65,6 +65,32 @@ def run(pdbf: str, mapf: str,
     score = sf(pose)
     pose.dump_pdb(out_pdb)
 
+# this is for if someone wants to skip the refine step
+# want to save the pdb with the energy table
+def score_and_dump(pdbf, mapf, reso, out_pdb):
+    flags = ['-mute all',
+            '-ignore_unrecognized_res',
+            '-default_max_cycles 200',
+            f'-edensity::mapfile {mapf}',
+            f'-edensity::mapreso {reso}']
+    pyrosetta.init(' '.join(flags))
+    pyrosetta.rosetta.basic.options.set_boolean_option("in:missing_density_to_jump", True)
+    pyrosetta.rosetta.basic.options.set_boolean_option("cryst:crystal_refine", True)
+    pyrosetta.rosetta.basic.options.set_boolean_option("corrections:shapovalov_lib_fixes_enable", True)
+    pyrosetta.rosetta.basic.options.set_file_option("corrections:score:rama_pp_map","scoring/score_functions/rama/fd_beta_nov2016")
+
+    pose = pyrosetta.pose_from_file(pdbf)
+
+    # set up scorefunction
+    sf = pyrosetta.create_score_function("ref2015_cart")
+    score_manager = pyrosetta.rosetta.core.scoring.ScoreTypeManager()
+    dens_scterm = score_manager.score_type_from_name("elec_dens_fast")
+    sf.set_weight(dens_scterm, 50.0)
+
+    # score pose with sf so etable is updated
+    score = sf(pose)
+    pose.dump_pdb(out_pdb)
+
 
 def commandline_main():
     parser = argparse.ArgumentParser()
