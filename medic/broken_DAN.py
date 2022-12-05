@@ -106,7 +106,7 @@ def extract_region(pose, extract_resis, pdbinfo,
     return new_pose, keep_resis
 
 
-def run_dan(infilepath):
+def run_dan(infilepath, query_sequence_indices):
     script_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "DeepAccNet")
     modelpath = os.path.join(script_dir, "models", "NatComm_standard")
 
@@ -153,7 +153,9 @@ def run_dan(infilepath):
     else:
         print(f"Feature file does not exist: {feature_file_name}", file=sys.stderr)
 
-    return lddt_cpu
+    # we return the lddts only for the region we care about
+    # the npz will have the pred. for the whole extraction
+    return lddt_cpu[query_sequence_indices[0]:query_sequence_indices[1]+1]
 
 
 def calc_lddts(pdbf, win_len, neighborhood, verbose=False, processes=1):
@@ -185,7 +187,7 @@ def calc_lddts(pdbf, win_len, neighborhood, verbose=False, processes=1):
 
     # setup for dan
     indices_to_keep = list()
-    extracted_lddts = list()
+    main_lddts = list()
     inputs = list()
     for resi in range(1, total_residues, win_len):
         end = resi+win_len
@@ -202,17 +204,14 @@ def calc_lddts(pdbf, win_len, neighborhood, verbose=False, processes=1):
         write_pdb_file(extracted_pose, ext_pdbf)
         inputs.append(ext_pdbf)
     
-    # run dans
+    # run dan
     if processes > 1:
         with multiprocessing.Pool(processes) as pool:
-            extracted_lddts = pool.map(run_dan, inputs)
+            main_lddts = pool.map(run_dan, inputs, indices_to_keep)
     else:
-        for p in inputs:
-            extracted_lddts.append(run_dan(p))
+        for p,k in zip(inputs, indices_to_keep):
+            main_lddts.append(run_dan(p,k))
     
-    main_lddts = list()
-    for i,lddts in enumerate(extracted_lddts):
-        main_lddts.append(lddts[indices_to_keep[i][0]:indices_to_keep[i][1]+1])
     main_lddts = np.concatenate(main_lddts)
 
     full_results['lddt'] = main_lddts
