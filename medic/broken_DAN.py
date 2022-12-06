@@ -186,10 +186,10 @@ def calc_lddts(pdbf, win_len, neighborhood, verbose=False, processes=1):
     if verbose: print(f'running tasks for DeepAccNet on {processes} processes')
 
     # setup for dan
-    indices_to_keep = list()
-    main_lddts = list()
-    inputs = list()
-    for resi in range(1, total_residues, win_len):
+    resi_range = list(range(1,total_residues, win_len))
+    indices_to_keep = [None]*len(resi_range)
+    inputs = [None]*len(resi_range)
+    for i,resi in enumerate(resi_range):
         end = resi+win_len
         if end >= total_residues:
             end = total_residues+1
@@ -198,19 +198,20 @@ def calc_lddts(pdbf, win_len, neighborhood, verbose=False, processes=1):
         extracted_pose, new_resis = extract_region(full_pose,
                             main_residues, pinf,
                             neighborhood)
-        indices_to_keep.append((new_resis.index(main_residues[0]),
-                            new_resis.index(main_residues[-1])))
+        indices_to_keep[i] = (new_resis.index(main_residues[0]),
+                            new_resis.index(main_residues[-1]))
         ext_pdbf = f"{os.path.basename(pdbf)[:-4]}_r{resi:04d}.pdb" 
         write_pdb_file(extracted_pose, ext_pdbf)
-        inputs.append(ext_pdbf)
+        inputs[i] = ext_pdbf
     
     # run dan
     if processes > 1:
         with multiprocessing.Pool(processes) as pool:
             main_lddts = pool.map(run_dan, inputs, indices_to_keep)
     else:
-        for p,k in zip(inputs, indices_to_keep):
-            main_lddts.append(run_dan(p,k))
+        main_lddts = [None]*len(resi_range)
+        for i,(p,k) in enumerate(zip(inputs, indices_to_keep)):
+            main_lddts[i] = run_dan(p,k)
     
     main_lddts = np.concatenate(main_lddts)
 
