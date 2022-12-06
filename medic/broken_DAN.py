@@ -106,7 +106,7 @@ def extract_region(pose, extract_resis, pdbinfo,
     return new_pose, keep_resis
 
 
-def run_dan(infilepath):
+def run_dan(infilepath, query_sequence_indices):
     script_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "DeepAccNet")
     modelpath = os.path.join(script_dir, "models", "NatComm_standard")
 
@@ -153,7 +153,9 @@ def run_dan(infilepath):
     else:
         print(f"Feature file does not exist: {feature_file_name}", file=sys.stderr)
 
-    return lddt_cpu
+    # we return the lddts only for the region we care about
+    # the npz will have the pred. for the whole extraction
+    return lddt_cpu[query_sequence_indices[0]:query_sequence_indices[1]+1]
 
 
 def calc_lddts(pdbf, win_len, neighborhood, verbose=False, processes=1):
@@ -184,10 +186,10 @@ def calc_lddts(pdbf, win_len, neighborhood, verbose=False, processes=1):
     if verbose: print(f'running tasks for DeepAccNet on {processes} processes')
 
     # setup for dan
-    indices_to_keep = list()
-    extracted_lddts = list()
-    inputs = list()
-    for resi in range(1, total_residues, win_len):
+    resi_range = list(range(1,total_residues, win_len))
+    indices_to_keep = [None]*len(resi_range)
+    inputs = [None]*len(resi_range)
+    for i,resi in enumerate(resi_range):
         end = resi+win_len
         if end >= total_residues:
             end = total_residues+1
@@ -196,23 +198,21 @@ def calc_lddts(pdbf, win_len, neighborhood, verbose=False, processes=1):
         extracted_pose, new_resis = extract_region(full_pose,
                             main_residues, pinf,
                             neighborhood)
-        indices_to_keep.append((new_resis.index(main_residues[0]),
-                            new_resis.index(main_residues[-1])))
+        indices_to_keep[i] = (new_resis.index(main_residues[0]),
+                            new_resis.index(main_residues[-1]))
         ext_pdbf = f"{os.path.basename(pdbf)[:-4]}_r{resi:04d}.pdb" 
         write_pdb_file(extracted_pose, ext_pdbf)
-        inputs.append(ext_pdbf)
+        inputs[i] = ext_pdbf
     
-    # run dans
+    # run dan
     if processes > 1:
         with multiprocessing.Pool(processes) as pool:
-            extracted_lddts = pool.map(run_dan, inputs)
+            main_lddts = pool.map(run_dan, inputs, indices_to_keep)
     else:
-        for p in inputs:
-            extracted_lddts.append(run_dan(p))
+        main_lddts = [None]*len(resi_range)
+        for i,(p,k) in enumerate(zip(inputs, indices_to_keep)):
+            main_lddts[i] = run_dan(p,k)
     
-    main_lddts = list()
-    for i,lddts in enumerate(extracted_lddts):
-        main_lddts.append(lddts[indices_to_keep[i][0]:indices_to_keep[i][1]+1])
     main_lddts = np.concatenate(main_lddts)
 
     full_results['lddt'] = main_lddts
