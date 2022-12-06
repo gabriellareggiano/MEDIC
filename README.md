@@ -6,6 +6,17 @@ MEDIC is a statistical model derived from logistic regression that will identify
 
 Robust residue-level error detection in cryo-electron microscopy models. Gabriella Reggiano, Daniel Farrell, Frank DiMaio (https://www.biorxiv.org/content/10.1101/2022.09.12.507680v1)
 
+## Data availability
+
+You can download the structures used for training [here](https://files.ipd.uw.edu/pub/MEDIC/errors.tar.gz)
+
+## Computational Resources
+DeepAccuracyNet runs much faster on GPUs, so if you have one available, we recommend using one to run MEDIC. We have run it on GPUs with only 8GB GPU memory.
+
+MEDIC has multiprocessing built in, so multiple cores can be used to speed up predictions.
+
+We have tested MEDIC on a 2800 residue structure and were able to run it on a personal laptop. 
+
 ## Installation/dependencies
 
 To install MEDIC, you need to:
@@ -21,23 +32,27 @@ Or you can follow the instructions below.
 - Apply for a license (free for academic use) [here](https://els2.comotion.uw.edu/product/rosetta)
 - Add the PyRosetta channel to your *~/.condarc* and replace the *username* and *password* with your information
 ```
-    channels:
-        - https://username:password@conda.graylab.jhu.edu
-        - defaults
+channels:
+    - https://username:password@conda.graylab.jhu.edu
+    - defaults
 ```
 
 #### Create a conda environment for MEDIC (here called *medic*):
-
 ```
-    conda create -n medic -y python=3.9 pyrosetta
+conda create -n medic -y pyrosetta
+```
+
+if you are using a Mac:
+```
+conda create -n medic -y python=3.9 pyrosetta pytorch=1.10
 ```
 
 #### Install MEDIC into the active conda environment
 ```
-    conda activate medic
-    git clone --recursive https://github.com/gabriellareggiano/MEDIC.git
-    cd MEDIC
-    pip install -e .
+conda activate medic
+git clone --recursive https://github.com/gabriellareggiano/MEDIC.git
+cd MEDIC
+pip install -e .
 ```
 
 
@@ -68,8 +83,10 @@ and get a path to a file, then you can run MEDIC with only:
 \
 The minimal command is shown below. Make sure your pdb is docked into the map before running.
 ```
-./path/to/MEDIC/detect_errors.py –pdb {path/to/pdb} –map {path/to/map} –reso {global resolution} –j {number_processes}
+./path/to/MEDIC/detect_errors.py --pdb {path/to/pdb} --map {path/to/map} -–reso {global resolution} –j {number_processes}
 ```
+Increasing the number of processes with `-j` will make step 3 go faster. However, if you run out of memory, lower the number of processes.
+
 If your structure has already been relaxed with Rosetta, add the flag: `--skip_relax`
   - The relax is mandatory, don’t skip if your pdb hasn’t been through Rosetta
 
@@ -88,7 +105,7 @@ If your structure has ligands or nucleac acids or noncanonical amino acids, add 
 - `{pdb}_MEDIC_predictions.csv`
   - this contains all the relevant scores for every residue with the predicted probabilities
 
-- `MEDIC_summary.txt`
+- `MEDIC_summary_{pdb}.txt`
   - this contains all the segments that have been marked as errors, as well as the scores that flagged them as errors
 ```
               25R - 28R, definite error       —> high probability error, residues 25-28, chain R

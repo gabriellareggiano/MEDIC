@@ -23,7 +23,7 @@ from medic.pdb_io import read_pdb_file, write_pdb_file
 
 def compile_data(pdbf, mapf, reso, verbose=False, processes=1,
         mem=0, queue="", workers=0):
-    if verbose: print('calculating zscores')
+    if verbose: print('calculating density scores')
     data = dens_zscores.run(pdbf, mapf, reso)
 
     WINDOW_LENGTH = 20
@@ -131,21 +131,22 @@ def parseargs():
 def commandline_main():
     args = parseargs()
 
+    input_pdb = args.pdb
     if args.clean:
         cleaned_pdb = f"{args.pdb[:-4]}_clean.pdb"
         clean_pdb(args.pdb, cleaned_pdb)
-        args.pdb = cleaned_pdb
+        input_pdb = cleaned_pdb
 
     if args.skip_relax:
         # make sure we have an energy table to pull scores from
         scored_pdb = f"{args.pdb[:-4]}_scored.pdb"
-        refine.score_and_dump(args.pdb, args.map, args.reso, scored_pdb)
-        args.pdb = scored_pdb
+        refine.score_and_dump(input_pdb, args.map, args.reso, scored_pdb)
+        input_pdb = scored_pdb
     else:
         refined_pdb = f"{args.pdb[:-4]}_refined.pdb"
         if args.verbose: print("running local relax")
-        refine.run(args.pdb, args.map, args.reso, refined_pdb)
-        args.pdb = refined_pdb
+        refine.run(input_pdb, args.map, args.reso, refined_pdb)
+        input_pdb = refined_pdb
 
     MEM = 0
     if args.scheduler:
@@ -154,10 +155,10 @@ def commandline_main():
             raise RuntimeError('set queue to run with scheduler')
         if not args.workers:
             raise RuntimeError('specify number of workers to use with dask')
-        errors = run_error_detection(args.pdb, args.map, args.reso,
+        errors = run_error_detection(input_pdb, args.map, args.reso,
                         mem=MEM, queue=args.queue, workers=args.workers, verbose=args.verbose)
     else:
-        errors = run_error_detection(args.pdb, args.map, args.reso, processes=args.processors, verbose=args.verbose)
+        errors = run_error_detection(input_pdb, args.map, args.reso, processes=args.processors, verbose=args.verbose)
     
     prob_coln = "error_probability" # this is defined in two places ugly
 
@@ -172,9 +173,9 @@ def commandline_main():
                         low_error_threshold)
     
     # output files
-    set_pred_as_bfac(args.pdb, errors, prob_coln, 
+    set_pred_as_bfac(input_pdb, errors, prob_coln, 
                     f"{os.path.basename(args.pdb)[:-4]}_MEDIC_bfac_pred.pdb")
-    with open("MEDIC_summary.txt", 'w') as f:
+    with open(f"MEDIC_summary_{os.path.basename(args.pdb)[:-4]}.txt", 'w') as f:
         f.write(error_summary)
 
     # print analysis
@@ -184,9 +185,9 @@ def commandline_main():
     print('\n-----------------------------------------------------------------')
     
     if not args.keep_intermediates:
-        clean_dan_files(args.pdb)
-        rm_file(scored_pdb)
-        rm_file(cleaned_pdb)
+        clean_dan_files(input_pdb)
+        if args.skip_relax: rm_file(scored_pdb)
+        if args.clean: rm_file(cleaned_pdb)
 
     
 if __name__ == "__main__":
