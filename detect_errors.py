@@ -23,7 +23,7 @@ from medic.pdb_io import read_pdb_file, write_pdb_file
 
 def compile_data(pdbf, mapf, reso, verbose=False, processes=1,
         mem=0, queue="", workers=0):
-    if verbose: print('calculating zscores')
+    if verbose: print('calculating density scores')
     data = dens_zscores.run(pdbf, mapf, reso)
 
     WINDOW_LENGTH = 20
@@ -186,8 +186,8 @@ def commandline_main():
     
     if not args.keep_intermediates:
         clean_dan_files(input_pdb)
-        rm_file(scored_pdb)
-        rm_file(cleaned_pdb)
+        if args.skip_relax: rm_file(scored_pdb)
+        if args.clean: rm_file(cleaned_pdb)
 
     
 if __name__ == "__main__":
