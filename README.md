@@ -10,6 +10,8 @@ Robust residue-level error detection in cryo-electron microscopy models. Gabriel
 
 You can download the structures used for training and validation [here](https://files.ipd.uw.edu/pub/MEDIC/errors.tar.gz)
 
+You can find errors identified by MEDIC on deposited EM structures between 3-5A resolution [here](https://files.ipd.uw.edu/pub/MEDIC/emdb_curated_MEDIC_errors.csv)
+
 ## Computational Resources
 DeepAccuracyNet runs much faster on GPUs, so if you have one available, we recommend using one to run MEDIC. We have run it on GPUs with only 8GB GPU memory.
 
