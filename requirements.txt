@@ -36,7 +36,7 @@ sortedcontainers
 tblib
 threadpoolctl
 toolz
-torch==1.10.0
+torch>=1.10.0
 tornado
 typing_extensions
 wheel
