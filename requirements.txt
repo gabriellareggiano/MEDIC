@@ -3,7 +3,7 @@ bokeh
 Bottleneck
 certifi
 cffi
-click
+click==8.0.2
 cloudpickle
 cytoolz
 dask==2021.10.0

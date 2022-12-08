@@ -247,8 +247,8 @@ def calc_lddts_hpc(pdbf, win_len,neighborhood,
     full_results['lddt'] = np.nan
 
     if verbose: print('submitting tasks for DeepAccNet')
-    tasks = list()
-    indices_to_keep = list()
+    resi_range = list(range(1,total_residues, win_len))
+    tasks = [None]*len(resi_range)
     with SLURMCluster(
         cores=1,
         memory=f"{mem}GB",
@@ -258,7 +258,7 @@ def calc_lddts_hpc(pdbf, win_len,neighborhood,
     ) as cluster:
         cluster.adapt(minimum=0, maximum=workers)
         with Client(cluster) as client:
-            for resi in range(1, total_residues, win_len):
+            for i,resi in enumerate(resi_range):
                 end = resi+win_len
                 if end >= total_residues:
                     end = total_residues+1
@@ -267,23 +267,18 @@ def calc_lddts_hpc(pdbf, win_len,neighborhood,
                 extracted_pose, new_resis = extract_region(full_pose,
                                     main_residues, pinf,
                                     neighborhood)
-                indices_to_keep.append((new_resis.index(main_residues[0]),
-                                   new_resis.index(main_residues[-1])))
-                # NOTE - if you change name below you need to change line 197, 'index = ...'
+                index_to_keep = (new_resis.index(main_residues[0]),
+                                    new_resis.index(main_residues[-1]))
                 ext_pdbf = f"{os.path.basename(pdbf)[:-4]}_r{resi:04d}.pdb" 
                 write_pdb_file(extracted_pose, ext_pdbf)
-                tasks.append(client.submit(run_dan, ext_pdbf))
+                tasks[i] = client.submit(run_dan, ext_pdbf, index_to_keep)
 
             if verbose: print('gathering results')
             
             sleep(30) # before running any DAN tasks, wait a bit before reading pdbs
-            extracted_lddts = client.gather(tasks)
+            main_lddts = client.gather(tasks)
 
     sleep(30) # after closing client, wait a bit before trying to read files
-    if verbose: print('collecting data')
-    main_lddts = list()
-    for i,lddts in enumerate(extracted_lddts):
-        main_lddts.append(lddts[indices_to_keep[i][0]:indices_to_keep[i][1]+1])
     main_lddts = np.concatenate(main_lddts)
     
     full_results['lddt'] = main_lddts
