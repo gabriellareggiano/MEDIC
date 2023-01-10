@@ -146,7 +146,7 @@ def clean_pdb(pdbf, out_pdb):
     with open(pdbf, 'r') as f:
         lines = f.readlines()
     pdb_lines = [line.strip() for line in lines
-                    if line[:4] == "ATOM" and line[17:21].strip() in compatible_res]
+                    if line[:4] == "ATOM" and line[17:20].strip() in compatible_res]
     with open(out_pdb, 'w') as f:
         f.write('\n'.join(pdb_lines))
     
