@@ -88,7 +88,7 @@ def set_pred_as_bfac(pdbf, predictions, prob_coln, new_pdbf):
 def run_error_detection(pdbf, mapf, reso, verbose=False, processes=1,
                 mem=0, queue="", workers=0):
     if verbose: print("collecting scores")
-    dat = compile_data(pdbf, mapf, reso, verbose=verbose, processes=1,
+    dat = compile_data(pdbf, mapf, reso, verbose=verbose, processes=processes,
                     mem=mem, queue=queue, workers=workers)
 
     if verbose: print('loading statistical model')
