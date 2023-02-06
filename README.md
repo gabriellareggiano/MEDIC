@@ -56,7 +56,8 @@ git clone --recursive https://github.com/gabriellareggiano/MEDIC.git
 cd MEDIC
 pip install -e .
 ```
-
+Note: whenever you want to use MEDIC you will need to make sure you have the proper conda environment activated.
+You can list all environments with `conda env list` and activate your environment with `conda activate medic`
 
 ## Running MEDIC on your structure
 ### MEDIC background
