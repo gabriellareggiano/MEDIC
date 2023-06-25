@@ -81,7 +81,7 @@ which detect_errors.py
 ```
 and get a path to a file, then you can run MEDIC with only:
 ```
-./detect_errors.py --help
+detect_errors.py --help
 ```
 \
 The minimal command is shown below. Make sure your pdb is docked into the map before running.
