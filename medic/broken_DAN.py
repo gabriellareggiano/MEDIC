@@ -207,7 +207,7 @@ def calc_lddts(pdbf, win_len, neighborhood, verbose=False, processes=1):
     # run dan
     if processes > 1:
         with multiprocessing.Pool(processes) as pool:
-            main_lddts = pool.map(run_dan, inputs, indices_to_keep)
+            main_lddts = pool.starmap(run_dan, zip(inputs, indices_to_keep))
     else:
         main_lddts = [None]*len(resi_range)
         for i,(p,k) in enumerate(zip(inputs, indices_to_keep)):
@@ -297,12 +297,16 @@ def parseargs():
     job_params.add_argument('--queue', type=str, default='dimaio')
     job_params.add_argument('--memory', type=int, default=40)
     job_params.add_argument('--num_workers', type=int, default=100)
+    job_params.add_argument('--local', action='store_true', default=False)
     return parser.parse_args()
 
 
 def commandline_main():
     args = parseargs()
-    df = calc_lddts_hpc(args.pdb, args.window_length, args.neighborhood, 
+    if args.local:
+        df = calc_lddts(args.pdb, args.window_length, args.neighborhood, verbose=True)
+    else:
+        df = calc_lddts_hpc(args.pdb, args.window_length, args.neighborhood, 
         args.memory, args.queue, args.num_workers)
     df.to_csv(f"{os.path.basename(args.pdb)[:4]}_DAN.csv")
 

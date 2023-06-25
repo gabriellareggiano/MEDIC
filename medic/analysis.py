@@ -111,7 +111,7 @@ def collect_error_info(scores, prob_coln, thres, contributing_csvf=""):
     segment_info['res_start'] = grperrors.first().reset_index()['resi']
     segment_info['res_end'] = grperrors.last().reset_index()['resi']
     segment_info['chID'] = grperrors.first().reset_index()['chID']
-    segment_info['avg_error_prob'] = grperrors.mean()[prob_coln].reset_index()[prob_coln]
+    segment_info['avg_error_prob'] = grperrors.mean(numeric_only=True)[prob_coln].reset_index()[prob_coln]
     segment_info['contribution'] = grperrors.apply(get_group_contributors).reset_index()[0]
     return segment_info
 
