@@ -59,7 +59,7 @@ Please set a specific torch version number by doing the following:
 - activate the MEDIC conda environment `conda activate medic`
 - go to the cloned MEDIC folder
 - edit the requirements.txt file
-  - set `torch==1.13.1` for GPUs
+  - set `torch==1.12` for GPUs
   - set `torch==1.10` for Macs
 - do `pip install -e .` to update your installation
 
