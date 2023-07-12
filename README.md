@@ -41,12 +41,7 @@ channels:
 
 #### Create a conda environment for MEDIC (here called *medic*):
 ```
-conda create -n medic -y pyrosetta
-```
-
-if you are using a Mac:
-```
-conda create -n medic -y python=3.9 pyrosetta pytorch=1.10
+conda create -n medic -y python=3.9 pyrosetta==2022.47+release.d2aee95
 ```
 
 #### Install MEDIC into the active conda environment
@@ -58,6 +53,15 @@ pip install -e .
 ```
 Note: whenever you want to use MEDIC you will need to make sure you have the proper conda environment activated.
 You can list all environments with `conda env list` and activate your environment with `conda activate medic`
+
+#### If you have a modern GPU or problems with torch when running MEDIC
+Please set a specific torch version number by doing the following:
+- activate the MEDIC conda environment `conda activate medic`
+- go to the cloned MEDIC folder
+- edit the requirements.txt file
+  - set `torch==1.13.1` for GPUs
+  - set `torch==1.10` for Macs
+- do `pip install -e .` to update your installation
 
 ## Running MEDIC on your structure
 ### MEDIC background
