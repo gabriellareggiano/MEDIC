@@ -100,7 +100,7 @@ If your structure has already been relaxed with Rosetta, add the flag: `--skip_r
   - The relax is mandatory, don’t skip if your pdb hasn’t been through Rosetta
 
 If your structure has ligands or nucleac acids or noncanonical amino acids, add the flag: `--clean` 
-  - Often, this error appears as `ValurError: Input contains NaN`. You can pass the already refined pdb with the clean flag to the program if you find yourself at this point.
+  - Often, forgetting to pass this flag will give the following error: `ValurError: Input contains NaN`. If you find yourself at this point, you can then pass the outputted refined pdb with the clean flag and the skip-relax flag.
 
 ## Visualizing and inspecting outputs
 
