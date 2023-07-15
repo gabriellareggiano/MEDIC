@@ -6,6 +6,8 @@ MEDIC is a statistical model derived from logistic regression that will identify
 
 Robust residue-level error detection in cryo-electron microscopy models. Gabriella Reggiano, Daniel Farrell, Frank DiMaio (https://www.biorxiv.org/content/10.1101/2022.09.12.507680v1)
 
+Residue-level error detection in cryoelectron microscopy models. Gabriella Reggiano, Wolfgang Lugmayr, Daniel Farrell, Thomas C. Marlovits, Frank DiMaio (https://www.cell.com/structure/fulltext/S0969-2126(23)00158-2?_returnURL=https%3A%2F%2Flinkinghub.elsevier.com%2Fretrieve%2Fpii%2FS0969212623001582%3Fshowall%3Dtrue)
+
 ## Data availability
 
 You can download the structures used for training and validation [here](https://files.ipd.uw.edu/pub/MEDIC/errors.tar.gz)
